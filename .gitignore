@@ -50,3 +50,9 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+DefaultBuild
+_4g_press.si4project
+*.pdf
+_4g_press.si4project
+_4g_press.Administrator.mtud
