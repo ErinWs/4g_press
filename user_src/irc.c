@@ -133,39 +133,25 @@ long formatData4fixDot(long temp,int dot)
 
 
 
-#define  VERIFYEN                                   0
-#define  MD_DATA_ID_READ_BASIC_INFO                 0x9020
-#define  MD_DATA_ID_READ_ALARM_PARAM                0x9021
-#define  MD_DATA_ID_READ_RPORT_PARAM                0x9022
-#define  MD_DATA_ID_READ_MEASURE_INFO               0x901f
-#define  MD_DATA_ID_READ_ACCESS_ADDR                0x9023
-#define  MD_DATA_ID_READ_LORA_PARAM                 0x9024
-#define  MD_DATA_ID_READ_HIGH_INFO                  0x9026
-#define  MD_DATA_ID_READ_GPS_LOC_INFO               0x9028
-#define  MD_DATA_ID_READ_MANUFACTURER_INFO          0x9029
-#define  MD_DATA_ID_READ_DEVICE_TYPE_INFO           0x902a
-#define  MD_DATA_ID_READ_DEVICE_ID_INFO             0x902b
-#define  MD_DATA_ID_READ_SENSOR_ID_INFO             0x902c
+#define  VERIFYEN                           0
+#define  MD_DATA_ID_READ_BASIC_INFO         0x9020
+#define  MD_DATA_ID_READ_ALARM_PARAM       0x9021
+#define  MD_DATA_ID_READ_RPORT_PARAM       0x9022
+#define  MD_DATA_ID_READ_MEASURE_INFO       0x901f
+#define  MD_DATA_ID_READ_ACCESS_ADDR        0x9023
+#define  MD_DATA_ID_READ_LORA_PARAM         0x9024
+#define  MD_DATA_ID_READ_HIGH_INFO          0x9026
 
 
-
-
-
-#define  MD_DATA_ID_SET_DEVICE_ADDR             0x9018
-#define  MD_DATA_ID_SET_ACCESS_ADDR             0x9005
-#define  MD_DATA_ID_ENTER_CAL_MODE              0xfa55//
-#define  MD_DATA_ID_ENTER_NORMAL_MODE           0xfa99//
-#define  MD_DATA_ID_WRITE_ALARM_PARAM           0x9001//
-#define  MD_DATA_ID_WRITE_CAL_DATA              0x9002//
-#define  MD_DATA_ID_WRITE_REPORT_PARAM          0x9003//
-#define  MD_DATA_ID_WRITE_DEVICE_TIME           0x9004
-#define  MD_DATA_ID_WRITE_LORA_PARAM            0x9004
-#define  MD_DATA_ID_WRITE_GPS_LOC_INFO          0x9007
-#define  MD_DATA_ID_WRITE_MANUFACTURER_INFO     0x9008
-#define  MD_DATA_ID_WRITE_DEVICE_TYPE_INFO      0x9009
-#define  MD_DATA_ID_WRITE_DEVICE_ID_INFO        0x900a
-#define  MD_DATA_ID_WRITE_SENSOR_INFO           0x900b
-
+#define  MD_DATA_ID_SET_DEVICE_ADDR         0x9018
+#define  MD_DATA_ID_SET_ACCESS_ADDR         0x9005
+#define  MD_DATA_ID_ENTER_CAL_MODE          0xfa55//
+#define  MD_DATA_ID_ENTER_NORMAL_MODE       0xfa99//
+#define  MD_DATA_ID_WRITE_ALARM_PARAM       0x9001//
+#define  MD_DATA_ID_WRITE_CAL_DATA          0x9002//
+#define  MD_DATA_ID_WRITE_REPORT_PARAM      0x9003//
+#define  MD_DATA_ID_WRITE_DEVICE_TIME       0x9004
+#define  MD_DATA_ID_WRITE_LORA_PARAM        0x9004
 
 
 
@@ -392,90 +378,15 @@ static unsigned char Pro_irc(unsigned char Cmd,unsigned char *buf)
 					ircMisc.send_buf[i++]=0;//Length
 					ircMisc.send_buf[i++]=buf[11];//dataID
 					ircMisc.send_buf[i++]=buf[12];
-					memcpy(&ircMisc.send_buf[i],device_comps.access_param.ip,25);
-					i+=25;
+					memcpy(&ircMisc.send_buf[i],device_comps.access_param.ip,4);//New IP
+					i+=4;
 					ircMisc.send_buf[i++]=device_comps.access_param.port>>8;
 					ircMisc.send_buf[i++]=device_comps.access_param.port;
 
-                    memcpy(&ircMisc.send_buf[i],device_comps.access_param.ip1,25);
-					i+=25;
-					ircMisc.send_buf[i++]=device_comps.access_param.port1>>8;
-					ircMisc.send_buf[i++]=device_comps.access_param.port1;
+                    ircMisc.send_buf[i++]=device_comps.access_param.flag;
+                    memcpy(&ircMisc.send_buf[i],&device_comps.access_param.domain_name,sizeof(device_comps.access_param.domain_name));
+					i+=sizeof(device_comps.access_param.domain_name);
                     ///ADD Other Data
-					ircMisc.send_buf[10]=i-11;
-					ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-					ircMisc.send_buf[i++]=0x16;
-					VerifyResult=0;
-					break;
-
-			case MD_DATA_ID_READ_GPS_LOC_INFO:                //
-					ircMisc.send_buf[i++]=(buf[9]|0x80);
-					ircMisc.send_buf[i++]=0;//Length
-					ircMisc.send_buf[i++]=buf[11];//dataID
-					ircMisc.send_buf[i++]=buf[12];
-					temp=device_comps.gps.glng;                                        
-					ircMisc.send_buf[i++]=temp>>24;
-					ircMisc.send_buf[i++]=temp>>16;
-					ircMisc.send_buf[i++]=temp>>8;
-					ircMisc.send_buf[i++]=temp;
-					temp=device_comps.gps.glat;                                        
-					ircMisc.send_buf[i++]=temp>>24;
-					ircMisc.send_buf[i++]=temp>>16;
-					ircMisc.send_buf[i++]=temp>>8;
-					ircMisc.send_buf[i++]=temp;
-                    ///ADD Other Data
-					ircMisc.send_buf[10]=i-11;
-					ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-					ircMisc.send_buf[i++]=0x16;
-					VerifyResult=0;
-					break;
-			case MD_DATA_ID_READ_MANUFACTURER_INFO:                //
-					ircMisc.send_buf[i++]=(buf[9]|0x80);
-					ircMisc.send_buf[i++]=0;//Length
-					ircMisc.send_buf[i++]=buf[11];//dataID
-					ircMisc.send_buf[i++]=buf[12];
-					memcpy(&ircMisc.send_buf[i],device_comps.manufacturer_info.name,25);
-					i+=25;
-	                ///ADD Other Data
-					ircMisc.send_buf[10]=i-11;
-					ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-					ircMisc.send_buf[i++]=0x16;
-					VerifyResult=0;
-					break;
-			case MD_DATA_ID_READ_DEVICE_TYPE_INFO:                //
-					ircMisc.send_buf[i++]=(buf[9]|0x80);
-					ircMisc.send_buf[i++]=0;//Length
-					ircMisc.send_buf[i++]=buf[11];//dataID
-					ircMisc.send_buf[i++]=buf[12];
-					memcpy(&ircMisc.send_buf[i],device_comps.device_info.type,25);
-					i+=25;
-	                ///ADD Other Data
-					ircMisc.send_buf[10]=i-11;
-					ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-					ircMisc.send_buf[i++]=0x16;
-					VerifyResult=0;
-					break;
-			case MD_DATA_ID_READ_DEVICE_ID_INFO:                //
-					ircMisc.send_buf[i++]=(buf[9]|0x80);
-					ircMisc.send_buf[i++]=0;//Length
-					ircMisc.send_buf[i++]=buf[11];//dataID
-					ircMisc.send_buf[i++]=buf[12];
-					memcpy(&ircMisc.send_buf[i],device_comps.device_info.id,25);
-					i+=25;
-	                ///ADD Other Data
-					ircMisc.send_buf[10]=i-11;
-					ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-					ircMisc.send_buf[i++]=0x16;
-					VerifyResult=0;
-					break;
-			case MD_DATA_ID_READ_SENSOR_ID_INFO:                //
-					ircMisc.send_buf[i++]=(buf[9]|0x80);
-					ircMisc.send_buf[i++]=0;//Length
-					ircMisc.send_buf[i++]=buf[11];//dataID
-					ircMisc.send_buf[i++]=buf[12];
-					memcpy(&ircMisc.send_buf[i],device_comps.sensor_info.id,25);
-					i+=25;
-	                ///ADD Other Data
 					ircMisc.send_buf[10]=i-11;
 					ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
 					ircMisc.send_buf[i++]=0x16;
@@ -658,13 +569,11 @@ static unsigned char Pro_irc(unsigned char Cmd,unsigned char *buf)
     			else 
     			{
 					access_param_t access_param_cpy={0};
-    				memcpy(&access_param_cpy.ip[0],&buf[13],25);
-    				
-    				access_param_cpy.port=((unsigned int)buf[13+25]<<8)+buf[13+26];
-    				memcpy(&access_param_cpy.ip1[0],&buf[13+27],25);
-    				
-    				access_param_cpy.port1=((unsigned int)buf[13+27+25]<<8)+buf[13+27+26];
-    				
+    				memcpy(&access_param_cpy.ip[0],&buf[13],4);
+    				access_param_cpy.port=((unsigned int)buf[13+4]<<8)+buf[13+5];
+    				access_param_cpy.flag=buf[13+6];
+    				memcpy(access_param_cpy.domain_name,&buf[13+7],48);
+    				access_param_cpy.domain_name[48]=0;//add '\0'
     				access_param_cpy.cs=Check_Sum_5A(&access_param_cpy, &access_param_cpy.cs-(unsigned char *)&access_param_cpy);
     				if(device_comps.save_access_param(&access_param_cpy,sizeof(access_param_cpy)))
     				{
@@ -687,162 +596,6 @@ static unsigned char Pro_irc(unsigned char Cmd,unsigned char *buf)
 				ircMisc.send_buf[i++]=0x16;
 				break;
 				
-			case MD_DATA_ID_WRITE_GPS_LOC_INFO :                //write
-			
-				if(device_comps.sw._bit.e2prom_driver_err)
-    			{
-    				ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    			}
-    			else 
-    			{
-				    device_comps.gps.glng=((unsigned long)buf[13]<<24)+((unsigned long)buf[14]<<16)+((unsigned long)buf[15]<<8)+buf[16];;
-    				device_comps.gps.glat=((unsigned long)buf[17]<<24)+((unsigned long)buf[18]<<16)+((unsigned long)buf[19]<<8)+buf[20];
-    	            device_comps.gps.cs=Check_Sum_5A(&device_comps.gps, &device_comps.gps.cs-(unsigned char *)&device_comps.gps);
-    				if(device_comps.save_gps_loc(&device_comps.gps,sizeof(device_comps.gps)))
-    				{
-    				    ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    				}
-    				else
-    				{
-    					ircMisc.send_buf[i++]=(buf[9]|0x80);
-    				}
-    				
-				}
-			
-				ircMisc.send_buf[i++]=0;
-				ircMisc.send_buf[i++]=buf[11];
-				ircMisc.send_buf[i++]=buf[12];
-
-				///ADD Other Data
-				ircMisc.send_buf[10]=i-11;
-				ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-				ircMisc.send_buf[i++]=0x16;
-				break;
-			case MD_DATA_ID_WRITE_MANUFACTURER_INFO :                //write
-			
-				if(device_comps.sw._bit.e2prom_driver_err)
-    			{
-    				ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    			}
-    			else 
-    			{
-    			    memcpy(device_comps.manufacturer_info.name,&buf[13],25);
-    			    
-		            device_comps.manufacturer_info.cs=Check_Sum_5A(&device_comps.manufacturer_info, &device_comps.manufacturer_info.cs-(unsigned char *)&device_comps.manufacturer_info);
-    				if(device_comps.save_manufacturer_info(&device_comps.manufacturer_info,sizeof(device_comps.manufacturer_info)))
-    				{
-    				    ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    				}
-    				else
-    				{
-    					ircMisc.send_buf[i++]=(buf[9]|0x80);
-    				}
-    				
-				}
-			
-				ircMisc.send_buf[i++]=0;
-				ircMisc.send_buf[i++]=buf[11];
-				ircMisc.send_buf[i++]=buf[12];
-
-				///ADD Other Data
-				ircMisc.send_buf[10]=i-11;
-				ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-				ircMisc.send_buf[i++]=0x16;
-				break;
-			case MD_DATA_ID_WRITE_DEVICE_TYPE_INFO :                //write
-			
-				if(device_comps.sw._bit.e2prom_driver_err)
-    			{
-    				ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    			}
-    			else 
-    			{
-    			    memcpy(device_comps.device_info.type,&buf[13],25);
-    			    
-		            device_comps.device_info.cs=Check_Sum_5A(&device_comps.device_info, &device_comps.device_info.cs-(unsigned char *)&device_comps.device_info);
-    				if(device_comps.save_device_info(&device_comps.device_info,sizeof(device_comps.device_info)))
-    				{
-    				    ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    				}
-    				else
-    				{
-    					ircMisc.send_buf[i++]=(buf[9]|0x80);
-    				}
-    				
-				}
-			
-				ircMisc.send_buf[i++]=0;
-				ircMisc.send_buf[i++]=buf[11];
-				ircMisc.send_buf[i++]=buf[12];
-
-				///ADD Other Data
-				ircMisc.send_buf[10]=i-11;
-				ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-				ircMisc.send_buf[i++]=0x16;
-				break;
-			
-			case MD_DATA_ID_WRITE_DEVICE_ID_INFO :                //write
-			
-				if(device_comps.sw._bit.e2prom_driver_err)
-    			{
-    				ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    			}
-    			else 
-    			{
-    			    memcpy(device_comps.device_info.id,&buf[13],25);
-    			    
-		            device_comps.device_info.cs=Check_Sum_5A(&device_comps.device_info, &device_comps.device_info.cs-(unsigned char *)&device_comps.device_info);
-    				if(device_comps.save_device_info(&device_comps.device_info,sizeof(device_comps.device_info)))
-    				{
-    				    ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    				}
-    				else
-    				{
-    					ircMisc.send_buf[i++]=(buf[9]|0x80);
-    				}
-    				
-				}
-			
-				ircMisc.send_buf[i++]=0;
-				ircMisc.send_buf[i++]=buf[11];
-				ircMisc.send_buf[i++]=buf[12];
-
-				///ADD Other Data
-				ircMisc.send_buf[10]=i-11;
-				ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-				ircMisc.send_buf[i++]=0x16;
-				break;
-			case MD_DATA_ID_WRITE_SENSOR_INFO :                //write
-			
-				if(device_comps.sw._bit.e2prom_driver_err)
-    			{
-    				ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    			}
-    			else 
-    			{
-    			    memcpy(device_comps.sensor_info.id,&buf[13],25);
-    			    
-		            device_comps.sensor_info.cs=Check_Sum_5A(&device_comps.sensor_info, &device_comps.sensor_info.cs-(unsigned char *)&device_comps.sensor_info);
-    				if(device_comps.save_sensor_info(&device_comps.sensor_info,sizeof(device_comps.sensor_info)))
-    				{
-    				    ircMisc.send_buf[i++]=(buf[9]|0x90);    
-    				}
-    				else
-    				{
-    					ircMisc.send_buf[i++]=(buf[9]|0x80);
-    				}
-    				
-				}
-			
-				ircMisc.send_buf[i++]=0;
-				ircMisc.send_buf[i++]=buf[11];
-				ircMisc.send_buf[i++]=buf[12];
-
-				///ADD Other Data
-				ircMisc.send_buf[10]=i-11;
-				ircMisc.send_buf[i++]=Check_Sum(ircMisc.send_buf,i);
-				ircMisc.send_buf[i++]=0x16;
-				break;	
 			case MD_DATA_ID_WRITE_REPORT_PARAM:  //report param
 				if(device_comps.sw._bit.e2prom_driver_err)
     			{
@@ -1242,7 +995,6 @@ ircComps_t ircComps=
 {
     ircMisc.recv_buf,
     &ircMisc.rec_pos,
-   
    30,
     {0},
     write_irc,

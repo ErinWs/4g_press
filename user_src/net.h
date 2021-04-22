@@ -6,7 +6,6 @@ typedef enum
 {
       EM_DIS_ACT=0,
       EM_DIS_OFF,
-      EM_DIS_GPS_STATUS,
       EM_DIS_SEARCH_NET,
       EM_DIS_REGISTER_NET,
       EM_DIS_SEND, 
@@ -31,9 +30,7 @@ typedef struct
     		uint8_t recvData	    :1;	
     		uint8_t running		    :1;
     		uint8_t socket_connected:1;
-    		uint8_t allow_data_send:1;
     		uint8_t ResolvedIP      :1;
-    		uint8_t push_data_ok     :1;
     		
     	}_bit;
     } St;
@@ -70,17 +67,6 @@ typedef struct
     	char oper[20];
     	char band[20];
     	long channel;
-    	unsigned char ResolvedIP[4];
-    	
-    	
-    	enum
-    	{
-    	    EM_IP0=0,
-    	    EM_IP1,
-    	    EM_NO_IP
-    	}            currentIP_No;
-    	char         currentIP[30];
-    	unsigned int currentPort;
 	
     }net_info;
 

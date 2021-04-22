@@ -250,11 +250,9 @@ typedef struct _HUM_COMPONENTS
 	int cursor_0;//0 line cursor position
 	int cursor_1;
 	int cursor_2;
-	int cursor_3;
 	int cursor_0_count;
 	int cursor_1_count;
 	int cursor_2_count;
-	int cursor_3_count;
 	/*******************end lcd seg define **************************/ 
 	
 	mode_type_t   current_mode;

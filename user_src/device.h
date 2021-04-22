@@ -77,16 +77,11 @@
 
 #define MD_LORA_PARAM_START_ADDR                       0x01e0
 
+
+
+  
 #define MD_TIME_SEG_DATA_START_ADDR                    0x0200
-#define MD_TIME_SEG_DATA_END_ADDR                      0x0400 
-
-#define MD_GPS_INFO_START_ADDR                         0x0600 
-#define MD_MANUFACTURER_INFO_START_ADDR                0x0620
-#define MD_DEVICE_INFO_START_ADDR                      0x0640
-#define MD_SENSOR_INFO_START_ADDR                      0x0680
-
-
-
+#define MD_TIME_SEG_DATA_END_ADDR                      0x0400   
 
 
   
@@ -157,11 +152,10 @@ float_level_param_t;
 
   typedef struct
   {
-      unsigned char ip[25];
+      unsigned char ip[4];
       unsigned int  port;
-      unsigned char ip1[25];
-      unsigned int  port1;
       char          flag;//0 null ,1 ip, 2,domain
+      char          domain_name[49];
       unsigned char cs;
   }
   access_param_t;
@@ -350,42 +344,7 @@ typedef struct _DEVICE_COMPONENTS
     int (*save_coe)(void const *,int);
     int (*clr_press)(void);
 
-    struct 
-    {
-        long glng;
-        long glat;
-        unsigned char isLocSuc;
-        unsigned char isActive;
-        unsigned char cs;
-    }gps;
-    int (*read_gps_loc)(void *,int );
-    int (*save_gps_loc)(void const *,int);
-    int (*get_gps_info_from_net)(char const *);
-    struct 
-    {
-        char name[25];
-        unsigned char cs;
-    }manufacturer_info;
-    int (*read_manufacturer_info)(void *,int );
-    int (*save_manufacturer_info)(void const *,int);
 
-    struct 
-    {
-        char type[25];
-        char id[25];
-        unsigned char cs;
-    }device_info;
-    int (*read_device_info)(void *,int );
-    int (*save_device_info)(void const *,int);
-
-    struct 
-    {
-        char id[25];
-        unsigned char cs;
-    }sensor_info;
-    int (*read_sensor_info)(void *,int );
-    int (*save_sensor_info)(void const *,int);
-  
     unsigned char batt;//batt voltage
 	calibration_param_t calibration_param;
 	calibration_param_t calibration_param_bak;

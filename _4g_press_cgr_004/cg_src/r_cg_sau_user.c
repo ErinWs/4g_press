@@ -65,9 +65,6 @@ extern volatile uint8_t * gp_uart2_rx_address;         /* uart2 receive buffer a
 extern volatile uint16_t  g_uart2_rx_count;            /* uart2 receive data number */
 extern volatile uint16_t  g_uart2_rx_length;           /* uart2 receive data length */
 /* Start user code for global. Do not edit comment generated here */
-volatile unsigned char uart0_rx_data;
-volatile unsigned char uart2_rx_data;
-
 /* End user code. Do not edit comment generated here */
 
 /***********************************************************************************************************************
@@ -92,23 +89,9 @@ static void __near r_uart0_interrupt_receive(void)
     rx_data = RXD0;
 
    
-	
-	  
-	if (g_uart0_rx_length > g_uart0_rx_count)
-    {
-        *gp_uart0_rx_address = rx_data;
-        gp_uart0_rx_address++;
-        g_uart0_rx_count++;
-
-        if (g_uart0_rx_length == g_uart0_rx_count)
-        {
-            r_uart0_callback_receiveend();
-        }
-    }
-    else
-    {
-        r_uart0_callback_softwareoverrun(rx_data);
-    }
+	  ircComps.recv_base_pt[*ircComps.recv_pos_pt]=rx_data;
+	  *ircComps.recv_pos_pt+=1;
+	  *ircComps.recv_pos_pt&=0x7f;
 }
 /***********************************************************************************************************************
 * Function Name: r_uart0_interrupt_send
@@ -138,20 +121,6 @@ static void __near r_uart0_interrupt_send(void)
 static void r_uart0_callback_receiveend(void)
 {
     /* Start user code. Do not edit comment generated here */
-    
-      ircComps.recv_base_pt[*ircComps.recv_pos_pt]=uart0_rx_data;
-	  *ircComps.recv_pos_pt+=1;
-	  *ircComps.recv_pos_pt&=0x7f;
-
-	  modbusComps.recv_base_pt[*modbusComps.recv_pos_pt]=uart0_rx_data;
-	  *modbusComps.recv_pos_pt+=1;
-	  *modbusComps.recv_pos_pt&=0x3f;
-
-	  
-	   modbusComps.recv_cfg_base_pt[*modbusComps.recv_cfg_pos_pt]=uart0_rx_data;
-	  *modbusComps.recv_cfg_pos_pt+=1;
-	  *modbusComps.recv_cfg_pos_pt&=0x3f;
-       R_UART0_Receive(&uart0_rx_data,1);
     /* End user code. Do not edit comment generated here */
 }
 /***********************************************************************************************************************
@@ -227,23 +196,34 @@ static void __near r_uart2_interrupt_receive(void)
     }
     
     rx_data = RXD2;
+    if(rx_data!='\0')
+  {
+      netComps.recv_base_pt[*netComps.recv_Idx_pt] = rx_data;
+      *netComps.recv_Idx_pt+=1;
+      *netComps.recv_Idx_pt&=0x3ff;
+      netComps.recv_RxSt=&netComps.recv_base_pt[*netComps.recv_Idx_pt-1];
+  }
+  else 
+  {
+      netComps.recv_base_pt[*netComps.recv_Idx_pt] = '\0';
+      *netComps.recv_Idx_pt = 0;
+  }
 
+//    if (g_uart2_rx_length > g_uart2_rx_count)
+//    {
+//        *gp_uart2_rx_address = rx_data;
+//        gp_uart2_rx_address++;
+//        g_uart2_rx_count++;
 
-    if (g_uart2_rx_length > g_uart2_rx_count)
-    {
-        *gp_uart2_rx_address = rx_data;
-        gp_uart2_rx_address++;
-        g_uart2_rx_count++;
-
-        if (g_uart2_rx_length == g_uart2_rx_count)
-        {
-            r_uart2_callback_receiveend();
-        }
-    }
-    else
-    {
-        r_uart2_callback_softwareoverrun(rx_data);
-    }
+//        if (g_uart2_rx_length == g_uart2_rx_count)
+//        {
+//            r_uart2_callback_receiveend();
+//        }
+//    }
+//    else
+//    {
+//        r_uart2_callback_softwareoverrun(rx_data);
+//    }
 }
 /***********************************************************************************************************************
 * Function Name: r_uart2_interrupt_send
@@ -273,19 +253,6 @@ static void __near r_uart2_interrupt_send(void)
 static void r_uart2_callback_receiveend(void)
 {
     /* Start user code. Do not edit comment generated here */
-    //if(rx_data!='\0')
-    {
-      netComps.recv_base_pt[*netComps.recv_Idx_pt] = uart2_rx_data;
-      *netComps.recv_Idx_pt+=1;
-      *netComps.recv_Idx_pt&=0x3ff;
-      netComps.recv_RxSt=&netComps.recv_base_pt[*netComps.recv_Idx_pt];
-    }
-    loraComps.recv_base_pt[*loraComps.recv_pos_pt]=uart2_rx_data;
-	*loraComps.recv_pos_pt+=1;
-	*loraComps.recv_pos_pt&=0x3f;
-
-	 R_UART2_Receive(&uart2_rx_data,1);
-
     /* End user code. Do not edit comment generated here */
 }
 /***********************************************************************************************************************
@@ -333,36 +300,15 @@ static void r_uart2_callback_error(uint8_t err_type)
 }
 
 /* Start user code for adding. Do not edit comment generated here */
-void enable_uart2(void)
-{
-    R_UART2_Receive(&uart2_rx_data,1);
-    R_UART2_Start();
-}
-void disable_uart2(void)
-{
-    R_UART2_Stop();
-}
-
-void enable_net_receive(void) 
-{
-    enable_uart2();
-}
-
-void disable_net_receive(void)
-{
-    disable_uart2();
-}
-
-
 void enable_lora(void)
 {
     
-    enable_uart2();
+    R_UART2_Start();
 }
 
 void disable_lora(void)
 {
-    disable_uart2();
+    R_UART2_Stop();
 }
 
 
@@ -439,20 +385,17 @@ void disable_modbus_receive(void)
 
 void enable_uart0_receive(void)
 {
-    R_UART0_Receive(&uart0_rx_data,1);
     SS0 |= _0002_SAU_CH1_START_TRG_ON ;    /* enable UART0 receive and transmit */
     SRIF0 = 0U;    /* clear INTSR0 interrupt flag */
     SRMK0 = 0U;    /* enable INTSR0 interrupt */
 }
 void enable_irc_receive(void)
 {
-    
     enable_uart0_receive();
 }
 void enable_modbus_receive(void)
 {
     MD_RESET_RS_485_T_R;
-   
     enable_uart0_receive();
 }
 
