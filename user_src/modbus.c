@@ -512,6 +512,7 @@ modbusComps_t modbusComps=
 {
     modbusMisc.recv_buf,
     &modbusMisc.rec_pos,
+   
     30,
     
     modbusMisc.recv_cfg_buf,

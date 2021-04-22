@@ -10,6 +10,8 @@
 #include "stdlib.h"
 #include "stdio.h"
 
+//#define  MD_PUSH_DATA_TO_IP1
+#define  MD_ALT_IP
 
 
 #define GSMPWRCTL_pin	P1_bit.no2
@@ -17,15 +19,14 @@
 #define GSMRST_pin      P1_bit.no3
 
 
-#define MD_NET_DEVICE_SEND_STEP      31
-#define MD_NET_DEVICE_DELAY_STEP     50
-#define MD_NET_DEVICE_NULL_STEP      -1
-
-#define   MD_MODULE_OP_MAX_TIME      180
+#define MD_NET_DEVICE_SEND_STEP         31
+#define MD_NET_DEVICE_DELAY_STEP        50
+#define MD_NET_DEVICE_RESOLVE_IP_STEP   27
 
 
-#define  enable_net_receive()       R_UART2_Start()
-#define  disable_net_receive()      R_UART2_Stop()
+#define MD_NET_DEVICE_NULL_STEP         255
+
+#define   MD_MODULE_OP_MAX_TIME         180
 
 typedef unsigned char BYTE;
 
@@ -68,8 +69,8 @@ static struct
 	
     char          pdp_id;
     unsigned char NoRegestPSENetCount;;
-    unsigned int  NoRegestCSNetCount;
-	
+    unsigned char  NoRegestCSNetCount;
+	unsigned char  NoGetGpsLocCount;
 	
 	MD_STATUS  (*write)(uint8_t * const tx_buf, uint16_t tx_num);
 	//unsigned char * (*check_net_device_ack)(unsigned char *FindStr);  
@@ -99,9 +100,10 @@ netMisc=
 	1,
     0,
 	0,
-		
+	0,	
 	R_UART2_Send
 };
+
 
 
 static void init_ENV_net_device(void)
@@ -114,6 +116,7 @@ static void init_ENV_net_device(void)
     netMisc.err_count=0;
 
     netComps.St._bit.socket_connected=0;
+   
     netComps.St._bit.ResolvedIP=0;
     netComps.St._bit.noIP=0;
 
@@ -265,6 +268,131 @@ static void   HandleErr()
     }
 }
 
+static void load_ip(void)
+{
+    memset(netComps.net_info.currentIP,0,sizeof(netComps.net_info.currentIP));
+    memcpy(netComps.net_info.currentIP,device_comps.access_param.ip,sizeof(device_comps.access_param.ip));
+    if(strlen(netComps.net_info.currentIP)>6)
+    {
+        netComps.net_info.currentIP_No=EM_IP0;
+        netComps.net_info.currentPort=device_comps.access_param.port;
+        
+    }
+    else 
+    {
+        memset(netComps.net_info.currentIP,0,sizeof(netComps.net_info.currentIP));
+        memcpy(netComps.net_info.currentIP,device_comps.access_param.ip1,sizeof(device_comps.access_param.ip1));
+        if(strlen(netComps.net_info.currentIP)>6)
+        {
+            netComps.net_info.currentIP_No=EM_IP1;
+            netComps.net_info.currentPort=device_comps.access_param.port1;
+        }
+        else
+        {
+            netComps.net_info.currentIP_No=EM_NO_IP;
+        }
+     }
+   
+}
+		
+static void switch_ip_push_data_to_ip1(void)
+{
+    memset(netComps.net_info.currentIP,0,sizeof(netComps.net_info.currentIP));
+    memcpy(netComps.net_info.currentIP,device_comps.access_param.ip1,sizeof(device_comps.access_param.ip1));
+    if(strlen(netComps.net_info.currentIP)>6)
+    {
+        netComps.net_info.currentPort=device_comps.access_param.port1;
+        netComps.net_info.currentIP_No=EM_IP1;
+         netComps.St._bit.ResolvedIP=0;
+        net_status_sjmp_any_step(MD_NET_DEVICE_RESOLVE_IP_STEP);
+        netComps.St._bit.push_data_ok=0;
+        *protocolComps.step=0;
+        netComps.St._bit.allow_data_send=0;
+     }
+     else
+     {
+        netComps.St._bit.err=1;
+        net_status_sjmp_any_step(MD_NET_DEVICE_NULL_STEP);
+     }
+      
+}
+
+static void check_ip_switch(void)
+{
+    #if defined (MD_ALT_IP)||defined(MD_PUSH_DATA_TO_IP1) 
+
+          if( netComps.net_info.currentIP_No==EM_IP0)
+          { 
+                if(netComps.St._bit.push_data_ok)
+                {
+                     protocolComps.sw._bit.dataPushYet=1;
+                #if defined(MD_PUSH_DATA_TO_IP1)
+                        switch_ip_push_data_to_ip1();
+                #else
+                       netComps.St._bit.err=1;
+                       net_status_sjmp_any_step(MD_NET_DEVICE_NULL_STEP);
+
+                #endif
+                }
+                else
+                {
+                       protocolComps.sw._bit.dataPushYet=0;
+                       switch_ip_push_data_to_ip1();
+                }     
+          }
+          else if(netComps.net_info.currentIP_No==EM_IP1)
+          {
+                if(netComps.St._bit.push_data_ok)
+                {
+                       protocolComps.sw._bit.dataPushYet1=1;
+                }
+                netComps.St._bit.err=1;
+                net_status_sjmp_any_step(MD_NET_DEVICE_NULL_STEP);
+          }
+          else
+          {
+                protocolComps.sw._bit.dataPushYet=0;
+                protocolComps.sw._bit.dataPushYet1=0;
+                netComps.St._bit.err=1;
+                net_status_sjmp_any_step(MD_NET_DEVICE_NULL_STEP);
+          }
+    #else
+            if(netComps.St._bit.push_data_ok)
+            {
+                   if( netComps.net_info.currentIP_No==EM_IP0)
+                   {
+                        protocolComps.sw._bit.dataPushYet=1;
+                   }
+                   else if( netComps.net_info.currentIP_No==EM_IP1)
+                   {
+                         protocolComps.sw._bit.dataPushYet=1;
+                   }
+                   else
+                   {
+                        protocolComps.sw._bit.dataPushYet=0;
+                        protocolComps.sw._bit.dataPushYet1=0;
+                   }
+            }
+            netComps.St._bit.err=1;
+            net_status_sjmp_any_step(MD_NET_DEVICE_NULL_STEP);
+         
+    #endif  
+}
+
+static void HandleDataErrIP()
+{
+    if(netMisc.err_count<1)
+    {
+        netMisc.err_count++;
+        net_status_sjmp_any_step(MD_NET_DEVICE_DELAY_STEP);//delay function
+    }
+    else 
+    {
+        check_ip_switch();  
+    }
+
+}
+
 static void   HandleRegTimeOut()
 {
     if(netMisc.reStartTimes>0)
@@ -308,7 +436,7 @@ static unsigned char * check_net_device_ack(unsigned char *FindStr)
     FindstrLen =(char) strlen((char *)FindStr);
     StartPt = &netComps.recv_base_pt[0];
     EndPt = netComps.recv_RxSt;
-    while(EndPt+1-StartPt>=FindstrLen)
+    while(EndPt-StartPt>=FindstrLen)
     {
     	if(!memcmp(FindStr,StartPt,FindstrLen))
     	 {
@@ -577,13 +705,13 @@ static void reset_net_device(void)
 		    {
                 GSMON_pin = 0;
                 netMisc.Reset_St=0;
-                net_status_sjmp_any_step(10);
+                net_status_sjmp_any_step(3);
             }
             else if(!netComps.AckTmr)
 			{
                 GSMON_pin = 0;
                 netMisc.Reset_St=0;
-			    net_status_sjmp_any_step(10);
+			    net_status_sjmp_any_step(3);
 			}
 			break;
 
@@ -808,12 +936,12 @@ static void Srv_GSM(void)
          case 1:
 			power_down_net_deivice();		
 			break;
-			
-			
-		case 10: 
+
+       	
+		case 3: 
 			if(!netMisc.AT_Waiting) 
 			{
-				netComps.AckTmr =5;	
+				netComps.AckTmr =3;	
 				netMisc.AT_Waiting = 1;
 			}
 			else if(!netComps.AckTmr)
@@ -822,7 +950,7 @@ static void Srv_GSM(void)
 			}
 			break;
 			
-		case 11:	
+		case 4:	
 			if(!netMisc.AT_Waiting)
 			{
 				reset_net_deive_rcvbuf();
@@ -834,10 +962,178 @@ static void Srv_GSM(void)
 			}
 			else if(check_net_device_ack("OK\r\n"))
 			{
-				 on_net_device_ack_ok();
+			     if(device_comps.gps.isActive)
+				 {
+                    device_comps.gps.isActive=0;
+                    net_status_sjmp_any_step(5);
+				 }
+				 else
+				 {
+                     net_status_sjmp_any_step(12);
+				 }
 			}	
 			break;
-			
+
+		/****************start get gps data********************/
+         
+
+         case 5:	
+    		if(!netMisc.AT_Waiting)
+    		{
+    			reset_net_deive_rcvbuf();
+    	        TX_ATCommand("\r\nAT+CFUN=0\r\n",30);
+            } 
+    		else if(!netComps.AckTmr)
+    		{
+    			  HandleNoAck(); 
+    		}
+    		else if(check_net_device_ack("OK\r\n"))
+    		{
+    			 on_net_device_ack_ok();
+    		}	
+    		break;
+
+		 case 6:	
+    		if(!netMisc.AT_Waiting)
+    		{
+    			reset_net_deive_rcvbuf();
+    	        TX_ATCommand("\r\nAT+QGPS=1\r\n",10);
+            } 
+    		else if(!netComps.AckTmr)
+    		{
+    			  HandleNoAck(); 
+    		}
+    		else if(check_net_device_ack("OK\r\n"))
+    		{
+    			 on_net_device_ack_ok();
+				 netMisc.NoGetGpsLocCount=0;
+    			 device_comps.gps.isLocSuc=0;
+    			 netComps.disCode=EM_DIS_GPS_STATUS;
+    		}	
+    		break;
+    		
+         case 7: 
+			if(!netMisc.AT_Waiting) 
+			{
+				netComps.AckTmr =10;	
+				netMisc.AT_Waiting = 1;
+			}
+			else if(!netComps.AckTmr)
+			{
+ 				 on_net_device_ack_ok();
+			}
+			break;
+    	 case 8:	
+    		if(!netMisc.AT_Waiting)
+    		{
+    			reset_net_deive_rcvbuf();
+    	        TX_ATCommand("\r\nAT+QGPSLOC=2\r\n",10);
+            } 
+    		else if(!netComps.AckTmr)
+    		{
+    			  HandleNoAck(); 
+    		}
+    		else if(check_net_device_ack("OK\r\n"))
+    		{
+                 if(pt_rssi=check_net_device_ack(","))
+    			 {
+    			       char loc[32]="";
+   			           char num=0;
+    			       for(i=0;i<sizeof(loc);i++)
+                        {
+                            if(*pt_rssi!=',')
+                            {
+                        	  loc[i]=*pt_rssi;
+                              pt_rssi++;
+                            }
+                            else
+                            {   num++;
+                                if(num>=2)
+                                {
+                                    break;
+                                }
+                                loc[i]=*pt_rssi;
+                                pt_rssi++;
+                                
+                            }
+                        }
+    			      if(device_comps.get_gps_info_from_net(loc))
+                      {
+                            netMisc.NoGetGpsLocCount++;
+                            if(netMisc.NoGetGpsLocCount>30)
+                            {
+                                on_net_device_ack_ok();
+                                netMisc.NoGetGpsLocCount=0;
+                                netComps.op_window_tmr+=100;
+                                
+                            }
+                            else
+                            {
+                                net_status_sjmp_any_step(7);
+                            }
+                       }
+                      else
+                      {
+                            
+                           device_comps.gps.isLocSuc=1;
+                           on_net_device_ack_ok();
+                           netComps.op_window_tmr=150;
+                          
+                      }
+                 }
+    			 else
+    			 {
+                      HandleNoAck(); 
+    			 }
+            }	
+    		break;	
+    	 case 9:	
+    		if(!netMisc.AT_Waiting)
+    		{
+    			reset_net_deive_rcvbuf();
+    	        TX_ATCommand("\r\nAT+QGPSEND\r\n",10);
+            } 
+    		else if(!netComps.AckTmr)
+    		{
+    			  HandleNoAck(); 
+    		}
+    		else if(check_net_device_ack("OK\r\n"))
+    		{
+    			 on_net_device_ack_ok();
+    		}	
+    		break;
+    		
+    	 
+		case 10:	
+    		if(!netMisc.AT_Waiting)
+    		{
+    			reset_net_deive_rcvbuf();
+    	        TX_ATCommand("\r\nAT+CFUN=1\r\n",30);
+            } 
+    		else if(!netComps.AckTmr)
+    		{
+    			  HandleNoAck(); 
+    		}
+    		else if(check_net_device_ack("OK\r\n"))
+    		{
+    			  net_status_sjmp_any_step(12);
+    		}	
+    		break;
+    	case 11: 
+			if(!netMisc.AT_Waiting) 
+			{
+				netComps.AckTmr =8;	
+				netMisc.AT_Waiting = 1;
+			}
+			else if(!netComps.AckTmr)
+			{
+ 				 on_net_device_ack_ok();
+			}
+            break;
+        /****************end get gps data********************/
+
+	   
+    		
 		case 12:	
 			if(!netMisc.AT_Waiting)
 			{
@@ -1228,7 +1524,7 @@ static void Srv_GSM(void)
 					 }
 				 }
                  on_net_device_ack_ok();
-				 netComps.disCode=EM_DIS_REGISTER_NET;
+				 
 			}	
 			break;
 			
@@ -1303,13 +1599,16 @@ static void Srv_GSM(void)
 			}
             break; 
 
+
+
+
          case 27:
-            if(device_comps.access_param.flag==2)//domain acces
+            if(netComps.net_info.currentIP_No<2)//device_comps.access_param.flag==2)//domain acces
             {
                 if(!netMisc.AT_Waiting)
     			{
                     char msg[120]="\r\nAT+QIDNSGIP=1,";
-                    sprintf(msg+strlen(msg),"%s",device_comps.access_param.domain_name);
+                    sprintf(msg+strlen(msg),"%s",netComps.net_info.currentIP);
                     sprintf(msg+strlen(msg),"%s","\r\n");
     				reset_net_deive_rcvbuf();
                     TX_ATCommand(msg,120);
@@ -1317,16 +1616,17 @@ static void Srv_GSM(void)
     			else if(!netComps.AckTmr)
     			{
     				on_net_device_ack_ok();
+    				netComps.disCode=EM_DIS_REGISTER_NET;
     			}
     			else if(pt_rssi=check_net_device_ack("+QIURC: \"dnsgip\",\""))
     			{
                     if(strstr(pt_rssi,"\r\n"))
                     {
                          char *ptsz;
-                         device_comps.access_param.ip[0]=strtol(pt_rssi,&ptsz,10);
-                         device_comps.access_param.ip[1]=strtol(ptsz+1,&ptsz,10);
-                         device_comps.access_param.ip[2]=strtol(ptsz+1,&ptsz,10);
-                         device_comps.access_param.ip[3]=strtol(ptsz+1,&ptsz,10);
+                         netComps.net_info.ResolvedIP[0]=strtol(pt_rssi,&ptsz,10);
+                         netComps.net_info.ResolvedIP[1]=strtol(ptsz+1,&ptsz,10);
+                         netComps.net_info.ResolvedIP[2]=strtol(ptsz+1,&ptsz,10);
+                         netComps.net_info.ResolvedIP[3]=strtol(ptsz+1,&ptsz,10);
         				 netComps.St._bit.ResolvedIP=1;
         				 reset_net_deive_rcvbuf();
         				 netComps.AckTmr=2;
@@ -1335,21 +1635,18 @@ static void Srv_GSM(void)
     			}
                 else if(pt_rssi=check_net_device_ack("ERROR"))
     			{
-                    HandleErr();
-    			}
+                    reset_net_deive_rcvbuf();
+        			netComps.AckTmr=2;
+                }
             }
-            else if(device_comps.access_param.flag==1)//ip access
-            {
-                 on_net_device_ack_ok();
-            }
-			else 
+            else 
 			{
                 net_status_sjmp_any_step(MD_NET_DEVICE_NULL_STEP);
                 netComps.St._bit.noIP=1;
 			}
             break; 
-             
-           case 28: 
+
+         case 28: 
               if(!netMisc.AT_Waiting)
               {
                   reset_net_deive_rcvbuf();
@@ -1383,7 +1680,7 @@ static void Srv_GSM(void)
 			}
 			else if(pt_rssi=check_net_device_ack("ERROR"))
 			{
-                HandleErr();
+                HandleDataErrIP();
 			}
             break;
             
@@ -1391,18 +1688,18 @@ static void Srv_GSM(void)
 			if(!netMisc.AT_Waiting)
 			{
                 char msg[120]="\r\nAT+QIOPEN=1,0,\"TCP\",";
-                if(device_comps.access_param.flag==2)//domain acces
-                {
-                    sprintf(msg+strlen(msg),"\"%s\",",device_comps.access_param.domain_name);
-                }
-                else
-                {
-                    sprintf(msg+strlen(msg),"\"%d.",device_comps.access_param.ip[0]);
-                    sprintf(msg+strlen(msg),"%d.",device_comps.access_param.ip[1]);
-                    sprintf(msg+strlen(msg),"%d.",device_comps.access_param.ip[2]);
-                    sprintf(msg+strlen(msg),"%d\",",device_comps.access_param.ip[3]);
-                }
-                sprintf(msg+strlen(msg),"%u,",device_comps.access_param.port);
+//                if(device_comps.access_param.flag==2)//domain acces
+//                {
+                    sprintf(msg+strlen(msg),"\"%s\",",netComps.net_info.currentIP);
+//                }
+//                else
+//                {
+//                    sprintf(msg+strlen(msg),"\"%d.",device_comps.access_param.ip[0]);
+//                    sprintf(msg+strlen(msg),"%d.",device_comps.access_param.ip[1]);
+//                    sprintf(msg+strlen(msg),"%d.",device_comps.access_param.ip[2]);
+//                    sprintf(msg+strlen(msg),"%d\",",device_comps.access_param.ip[3]);
+//                }
+                sprintf(msg+strlen(msg),"%u,",netComps.net_info.currentPort);
                 sprintf(msg+strlen(msg),"%s" ,"0,0\r\n");
 				reset_net_deive_rcvbuf();
                 TX_ATCommand(msg,150);
@@ -1415,22 +1712,20 @@ static void Srv_GSM(void)
 			{
 			    if(check_net_device_ack("+QIOPEN: 0,0"))
 				{
-					on_net_device_ack_ok();
-					netComps.St._bit.socket_connected=1;
-	            }
-	            else if(check_net_device_ack("+QIOPEN: 0,566"))
+                     on_net_device_ack_ok();
+					 netComps.St._bit.socket_connected=1;
+					 netComps.St._bit.allow_data_send=1;
+                }
+	            else if(check_net_device_ack("+QIOPEN: 0,566")||check_net_device_ack("+QIOPEN: 0,567"))
 				{
-					HandleErr();
+					HandleDataErrIP();
 	            }
-	        }
+	       }
 			else if(pt_rssi=check_net_device_ack("ERROR"))
 			{
-                HandleErr();
+               HandleDataErrIP();
 			}
             break;
-        
-     
-
 
         
 
@@ -1480,7 +1775,7 @@ static void Srv_GSM(void)
             }
             else if(pt_rssi=check_net_device_ack("ERROR"))
             {
-                HandleErr();
+                HandleDataErrIP();
             }
             break;
 
@@ -1503,7 +1798,7 @@ static void Srv_GSM(void)
 			}
             else if(pt_rssi=check_net_device_ack("ERROR"))
             {
-                HandleErr();
+                HandleDataErrIP();
             }
 
 			break;
@@ -1543,7 +1838,7 @@ static void Srv_GSM(void)
                     if(!noAckBytes)
                     {
                         protocolComps.sw._bit.DataRdy=0;
-                        protocolComps.sw._bit.dataPushYet=1;
+                        netComps.St._bit.push_data_ok=1;
                         query_times=0;
                         on_net_device_ack_ok();
                     }
@@ -1566,7 +1861,7 @@ static void Srv_GSM(void)
     		}
             else if(pt_rssi=check_net_device_ack("ERROR"))
             {
-                HandleErr();
+                HandleDataErrIP();
             }
 
     		break; 
@@ -1610,7 +1905,7 @@ static void Srv_GSM(void)
 				{
                     
                     Length=atoi(pt_rssi);
-                    if((Length<1)||(Length>256))
+                    if((Length<1)||(Length>512))
                     {
                     	netMisc.ErrCode=0;
                     }
@@ -1630,7 +1925,11 @@ static void Srv_GSM(void)
 				}
 				DealAnalyticCode(netMisc.ErrCode);
             }
-            break;    
+            break; 
+
+
+
+            
 
        /*****************************END MSG LOOP*****************/
        
@@ -1647,6 +1946,7 @@ static void Srv_GSM(void)
 			}
 			break;
 
+      
         
         case MD_NET_DEVICE_NULL_STEP:
 
@@ -1673,18 +1973,35 @@ void net_task_handle(void)
 		{
 			hot_start_net_device();
 		}
+
+	    load_ip();
 		
+	    netComps.St._bit.push_data_ok=0;
+        netComps.St._bit.recvData=0;
+        netComps.St._bit.allow_data_send=0;
 		netMisc.reStartTimes=1;
         netComps.St._bit.running=1;
         netComps.op_window_tmr = MD_MODULE_OP_MAX_TIME;	//5¡¤??¨®//
         netComps.St._bit.on=0;
+        netComps.disCode=EM_DIS_ACT;
+		enter_report_mode();
+       
 	}
 	
 	if(netComps.St._bit.off)
 	{
-		netComps.St._bit.off=0;
-		netComps.St._bit.offing=1;
-		stop_net_device();
+        if(protocolComps.sw._bit.isAckTmrOut)
+        {
+            check_ip_switch();//is push data to ip1?
+            protocolComps.sw._bit.isAckTmrOut=0;
+        }
+        else
+        {
+            netComps.disCode=EM_DIS_OFF;
+    		netComps.St._bit.offing=1;
+    		stop_net_device();
+        }
+        netComps.St._bit.off=0;
 	}
 	
 	if(netComps.St._bit.running)
