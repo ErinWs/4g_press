@@ -217,7 +217,7 @@ static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
 {
     int i=0;
     long temp=0;
-    char msg[25]="";
+    char msg[32]="";
 //    buf[i++]=0;//mesID
 //   i+=AddAddr(&buf[i]);//meter id
 //
@@ -266,34 +266,57 @@ static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
 //    i+=AddLastSamplTps(&buf[i]);
 //    
 //    return i;
-
-    sprintf(&buf[i],"$XIANYUNYI$;");
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.manufacturer_info.name,sizeof(device_comps.manufacturer_info.name));
+    sprintf(&buf[i],"$%s$;",msg);
     i+=strlen(&buf[i]);
     
-
-    sprintf(&buf[i],"DTYPE:%s;","4GIoTPTI");
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.type));
+    sprintf(&buf[i],"DTYPE:%s;",msg);
     i+=strlen(&buf[i]);
     
-
-    sprintf(&buf[i],"DSN:");
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.id));
+    sprintf(&buf[i],"DSN:%s;",msg);
     i+=strlen(&buf[i]);
-    i+=AddAddr(&buf[i]);
-    buf[i++]=';';
+    //i+=AddAddr(&buf[i]);
+   // buf[i++]=';';
     
 
     sprintf(&buf[i],"START;");
     i+=strlen(&buf[i]);
-    
 
-    sprintf(&buf[i],"GLNG:%0.1f;",0.0);
-    i+=strlen(&buf[i]); 
     
-
-    sprintf(&buf[i],"GLAT:%0.1f;",0.0);
+    if(device_comps.gps.glng<0)
+    {
+        sprintf(&buf[i],"GLNG:%07ld;",device_comps.gps.glng);
+    }
+    else
+    {
+        sprintf(&buf[i],"GLNG:%06ld;",device_comps.gps.glng);
+    }
     i+=strlen(&buf[i]);
+    memmove(&buf[i]-5,&buf[i]-6,6);
+    *(&buf[i]-6)='.',
+    i++;
     
+    if(device_comps.gps.glat<0)
+    {
+        sprintf(&buf[i],"GLNG:%07ld;",device_comps.gps.glat);
+    }
+    else
+    {
+        sprintf(&buf[i],"GLNG:%06ld;",device_comps.gps.glat);
+    }
+    i+=strlen(&buf[i]);
+    memmove(&buf[i]-5,&buf[i]-6,6);
+    *(&buf[i]-6)='.',
+    i++;
+    
+ 
 
-
+    memset(msg,0,sizeof(msg));
     memcpy(msg,netComps.net_info.iccid,20);
     sprintf(&buf[i],"CCID:%s;",msg);
     i+=strlen(&buf[i]);
@@ -318,7 +341,7 @@ static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
     
     
 /**************start measure data*****************/
-    sprintf(&buf[i],"DQT:%s;","C_6_A");
+    sprintf(&buf[i],"DQT:%s;","C_5_A");
     i+=strlen(&buf[i]);
     
 
@@ -330,16 +353,20 @@ static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
     {
         temp=device_comps.current_press*1000;
     }
-    sprintf(&buf[i],"DQ1:");
-    i+=strlen(&buf[i]);
-    i+=AddAddr(&buf[i]);
     
-    sprintf(&buf[i],"_%0.4f",(float)temp/pwr(device_comps.calibration_param.dot));
+    
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.sensor_info.id,sizeof(device_comps.sensor_info.id));
+    sprintf(&buf[i],"DQ1:%s",msg);
+    i+=strlen(&buf[i]);
+    //i+=AddAddr(&buf[i]);
+    
+    sprintf(&buf[i],"_%0.3f",(float)temp/pwr(device_comps.calibration_param.dot)*100);//kpa->mm
     i+=strlen(&buf[i]);
 
-    sprintf(&buf[i],"_%0.1f",(float)device_comps.current_temp/10);
+    sprintf(&buf[i],"_%0.1f;",(float)device_comps.current_temp/10);
     i+=strlen(&buf[i]);
-    buf[i++]=';';
+    
 
     /**************end measure data*****************/
 
@@ -672,7 +699,8 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
 //	return err;
     int i=0;
     char *const buf=protocolMisc.buf;
-    char * find;
+    char *find;
+    char  msg[32]="";
 		
     if(1)
     {
@@ -700,10 +728,18 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
             port=atol(find);
             if(port>0)
             {
-                   
-    			   device_comps.access_param.port=port;
-    			   device_comps.access_param.cs=Check_Sum_5A(&device_comps.access_param, &device_comps.access_param.cs-(unsigned char *)&device_comps.access_param);
-    			   device_comps.save_access_param(&device_comps.access_param,sizeof(device_comps.access_param));
+                    if(netComps.net_info.currentIP_No==EM_IP0)
+                    {
+                        device_comps.access_param.port=port;
+                        device_comps.access_param.cs=Check_Sum_5A(&device_comps.access_param, &device_comps.access_param.cs-(unsigned char *)&device_comps.access_param);
+                        device_comps.save_access_param(&device_comps.access_param,sizeof(device_comps.access_param));
+    			   }
+    			   else if(netComps.net_info.currentIP_No==EM_IP1)
+    			   {
+    			        device_comps.access_param.port1=port;
+                        device_comps.access_param.cs=Check_Sum_5A(&device_comps.access_param, &device_comps.access_param.cs-(unsigned char *)&device_comps.access_param);
+                        device_comps.save_access_param(&device_comps.access_param,sizeof(device_comps.access_param));
+                    }
             }
         }
 
@@ -712,35 +748,47 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
         {
     	    int len;	
     	    find+=strlen("SA:");
-    	    len=strstr(find,";")-find;
+    	    len=strstr(find,";")- find;
             
-            if( len>1 && len<49)
+            if( len>6&& len<26)
             {
-                   memset(&device_comps.access_param.domain_name,0,sizeof(device_comps.access_param.domain_name));
-                   memcpy(&device_comps.access_param.domain_name,find,len);
-                   device_comps.access_param.domain_name[48]=0;//add '\0'
-                   device_comps.access_param.flag=2;
-                   device_comps.access_param.cs=Check_Sum_5A(&device_comps.access_param, &device_comps.access_param.cs-(unsigned char *)&device_comps.access_param);
-    			   device_comps.save_access_param(&device_comps.access_param,sizeof(device_comps.access_param));
+                  if(netComps.net_info.currentIP_No==EM_IP0)
+                    {
+                        memset(&device_comps.access_param.ip,0,sizeof(device_comps.access_param.ip));
+                        memcpy(&device_comps.access_param.ip,find,len);
+                        device_comps.access_param.cs=Check_Sum_5A(&device_comps.access_param, &device_comps.access_param.cs-(unsigned char *)&device_comps.access_param);
+    			        device_comps.save_access_param(&device_comps.access_param,sizeof(device_comps.access_param));
+                    }
+                    else if(netComps.net_info.currentIP_No==EM_IP1)
+                    {
+                        memset(&device_comps.access_param.ip1,0,sizeof(device_comps.access_param.ip1));
+                        memcpy(&device_comps.access_param.ip1,find,len);
+                        device_comps.access_param.cs=Check_Sum_5A(&device_comps.access_param, &device_comps.access_param.cs-(unsigned char *)&device_comps.access_param);
+    			        device_comps.save_access_param(&device_comps.access_param,sizeof(device_comps.access_param));
+                    }
             }
+        
         }
         
-   }
-
+    }
     memset(protocolMisc.buf,0,sizeof(protocolMisc.buf));
     
-    sprintf(&buf[i],"$XIANYUNYI$;");
+    
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.manufacturer_info.name,sizeof(device_comps.manufacturer_info.name));
+    sprintf(&buf[i],"$%s$;",msg);
     i+=strlen(&buf[i]);
     
-
-    sprintf(&buf[i],"DTYPE:%s;","4GIoTPTI");
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.type));
+    sprintf(&buf[i],"DTYPE:%s;",msg);
     i+=strlen(&buf[i]);
     
-
-    sprintf(&buf[i],"DSN:");
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.id));
+    sprintf(&buf[i],"DSN:%s;",msg);
     i+=strlen(&buf[i]);
-    i+=AddAddr(&buf[i]);
-    buf[i++]=';';
+    
     
 
     sprintf(&buf[i],"START;");
@@ -764,7 +812,7 @@ static void Srv_Protol(int event)
 
 	if(protocolMisc.step==0)//Encapsulate the registration package and send a message to esam encryption
 	{
-		if(netComps.St._bit.socket_connected>0)
+		if(netComps.St._bit.allow_data_send>0)
 		{
             if(!protocolComps.sw._bit.DataRdy)
             {
@@ -788,7 +836,7 @@ static void Srv_Protol(int event)
 			protocolComps.msgLen=netComps.msgLen;
 			if(!Analysis_downstream_package(protocolMisc.buf,protocolComps.msgLen,&address_field))//Remove the link layer protocol (68, len crc etc)
 			{
- //               netComps.op_window_tmr=10;
+ //               netComps.op_window_tmr=5;
 //                if(address_field>=40&&address_field<=49)
 //                {
 //                    DealDownCmd(protocolMisc.buf,protocolComps.msgLen);
@@ -814,7 +862,7 @@ static void Srv_Protol(int event)
 		{
 			if(!protocolComps.AckTmr)
 			{
-                if(!protocolComps.sw._bit.dataPushYet)
+                if(!netComps.St._bit.push_data_ok)
                 {
     				if(protocolMisc.reRryTimes>0)
     				{
@@ -836,12 +884,17 @@ static void Srv_Protol(int event)
                     protocolComps.sw._bit.AckTmrOut=1;
                     protocolMisc.step++;
 				}
-			}
+				
+				if(protocolComps.sw._bit.AckTmrOut)
+				{
+                     protocolComps.sw._bit.isAckTmrOut=1;
+				}
+		    }
 		}
 	}
 	else if(protocolMisc.step==2)
 	{
-        //if()
+        
 	}
 
     if(netComps.St._bit.noResponse||netComps.St._bit.windowTimeOut||netComps.St._bit.err||netComps.St._bit.noIP
@@ -857,7 +910,7 @@ static void Srv_Protol(int event)
         protocolComps.sw._bit.cmd_shutDown=0;
         protocolComps.sw._bit.AckTmrOut=0;
         netComps.op_window_tmr=0;
-        netComps.disCode=EM_DIS_OFF;
+        
      }
 	
 }
@@ -875,17 +928,18 @@ static void protocolComps_task_handle()
 			if((protocolComps.triggerIrq.All>>i)&1)
 			{
 				protocolMisc.event_index=i;
-				
+				if(!protocolMisc.event_index)
+				{
+                    device_comps.gps.isActive=1;
+				}
                 protocolMisc.step=0;
 				protocolMisc.reRryTimes=2;
                 protocolComps.sw._bit.DataRdy=0;
-	            protocolComps.sw._bit.dataPushYet=0; //
+	            protocolComps.sw._bit.dataPushYet=0;
+                protocolComps.sw._bit.dataPushYet1=0;
+                protocolComps.sw._bit.isAckTmrOut=0;
 				protocolComps.triggerIrq.All&=~((unsigned int)1<<protocolMisc.event_index);
-				
-                netComps.St._bit.recvData=0;
-				
-				
-				break;
+                break;
 			}
 		}
 	}
@@ -895,8 +949,7 @@ static void protocolComps_task_handle()
 		if(!netComps.St._bit.running)
 		{
 			netComps.St._bit.on=1;
-			netComps.disCode=EM_DIS_ACT;
-			enter_report_mode();
+			
 			device_comps.report_param.triggerTimes++;
 			device_comps.report_param.cs=Check_Sum_5A(&device_comps.report_param, &device_comps.report_param.cs-(unsigned char *)&device_comps.report_param);
     		device_comps.save_report_param(&device_comps.report_param,sizeof(device_comps.report_param));
@@ -917,6 +970,7 @@ protocolComps_t protocolComps=
     protocolMisc.buf,
     0,
     30,
+    &protocolMisc.step,
     &protocolMisc.event_index,//unsigned int * const event_index_pt;
     protocolComps_task_handle
 };

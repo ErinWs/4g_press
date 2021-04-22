@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements device driver for SAU module.
-* Creation Date: 2020/12/30 星期三
+* Creation Date: 2020/12/30 星期�?
 ***********************************************************************************************************************/
 #ifndef SAU_H
 #define SAU_H
@@ -300,6 +300,9 @@ static void r_uart2_callback_sendend(void);
 static void r_uart2_callback_softwareoverrun(uint16_t rx_data);
 
 /* Start user code for function. Do not edit comment generated here */
+
+void enable_net_receive(void); 
+void disable_net_receive(void);
 void enable_lora(void);
 void disable_lora(void);
 

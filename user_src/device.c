@@ -35,18 +35,18 @@ static const long temp_tab[] =
 	117280,  111149, 105351,  99867 , 94681,   89776,  85137,  80750,  76600,   72676,  // -25 .........-16
 	68963 ,  65451 ,  62129,  58986 , 56012,   53198,  50539,  48013,  45627,   43368,   // -15.......... -6
 	41229 ,  39204 ,  37285,  35468 , 33747,   32116,  30570,  29105,  27716,   26399,   // -5............4
-//	25150 ,  23965 ,  22842,  21776 , 20764,   19783,  18892,  18026,  17204,   16423,   //  5.......... 14
-//	15681 ,  14976 ,  14306,  13669 , 13063,   12487,  11939,  11418,  10921,   10449,    //  15...........24
-//	10000 ,  9571  ,   9164,  8775  ,  8405,   8052 ,  7716,    7396,   7090,    6798,     // 25...........34
-//	6520  ,   6255 ,   6002,  5760  ,  5529,    5309,  5098,    4897,   4704,    4521,     //  35..........44
-//	4345  ,   4177 ,   4016,  3863  ,  3716,    3588,  3440,    3311,   3188,    3069,    // 45...........54
-//	2956  ,   2848 ,   2744,  2644  ,  2548,    2457,  2369,    2284,   2204,    2126,2051, //  55..........65
-//	1980  ,    1911,   1845,  1782  ,  1721,    1663,  1606,    1552,   1500, 1450,  //66-75
-//	1402  ,    1356,   1312,  1269  ,  1228,    1188,  1150,    1113,   1078, 1044,  //76-85
-//	1011  ,     979,    948,  919   ,   891,     863,   837,     811,    787,  763,   //86-95
-//	740   ,     718,    697,  676   ,   657,     637,   619,     601,    584,  567,   //96-105
-//	551   ,     535,    520,  505   ,   491,     477,   464,     451,    439,  427,   //106-115
-//	415   ,     404,    393,  383   ,   373,     363,   353,     344,    335,  326   //116-125
+	25150 ,  23965 ,  22842,  21776 , 20764,   19783,  18892,  18026,  17204,   16423,   //  5.......... 14
+	15681 ,  14976 ,  14306,  13669 , 13063,   12487,  11939,  11418,  10921,   10449,    //  15...........24
+	10000 ,  9571  ,   9164,  8775  ,  8405,   8052 ,  7716,    7396,   7090,    6798,     // 25...........34
+	6520  ,   6255 ,   6002,  5760  ,  5529,    5309,  5098,    4897,   4704,    4521,     //  35..........44
+	4345  ,   4177 ,   4016,  3863  ,  3716,    3588,  3440,    3311,   3188,    3069,    // 45...........54
+	2956  ,   2848 ,   2744,  2644  ,  2548,    2457,  2369,    2284,   2204,    2126,2051, //  55..........65
+	1980  ,    1911,   1845,  1782  ,  1721,    1663,  1606,    1552,   1500, 1450,  //66-75
+	1402  ,    1356,   1312,  1269  ,  1228,    1188,  1150,    1113,   1078, 1044,  //76-85
+	1011  ,     979,    948,  919   ,   891,     863,   837,     811,    787,  763,   //86-95
+	740   ,     718,    697,  676   ,   657,     637,   619,     601,    584,  567,   //96-105
+	551   ,     535,    520,  505   ,   491,     477,   464,     451,    439,  427,   //106-115
+	415   ,     404,    393,  383   ,   373,     363,   353,     344,    335,  326   //116-125
 
 };
 
@@ -192,6 +192,49 @@ int save_device_coe(void const *buf,int len )
 {
     return _24cxx_comps.write(MD_DEVICE_COE_START_ADDR,buf,len);
 }
+
+
+static int read_gps_loc(void *buf,int len )
+{
+    return _24cxx_comps.read(MD_GPS_INFO_START_ADDR,buf,len);
+}
+
+static int save_gps_loc(void const *buf,int len )
+{
+    return _24cxx_comps.write(MD_GPS_INFO_START_ADDR,buf,len);
+}
+
+static int read_manufacturer_info(void *buf,int len )
+{
+    return _24cxx_comps.read(MD_MANUFACTURER_INFO_START_ADDR,buf,len);
+}
+
+static int save_manufacturer_info(void const *buf,int len )
+{
+    return _24cxx_comps.write(MD_MANUFACTURER_INFO_START_ADDR,buf,len);
+}
+
+static int read_device_info(void *buf,int len )
+{
+    return _24cxx_comps.read(MD_DEVICE_INFO_START_ADDR,buf,len);
+}
+
+static int save_device_info(void const *buf,int len )
+{
+    return _24cxx_comps.write(MD_DEVICE_INFO_START_ADDR,buf,len);
+}
+
+static int read_sensor_info(void *buf,int len )
+{
+    return _24cxx_comps.read(MD_SENSOR_INFO_START_ADDR,buf,len);
+}
+
+static int save_sensor_info(void const *buf,int len )
+{
+    return _24cxx_comps.write(MD_SENSOR_INFO_START_ADDR,buf,len);
+}
+
+
 
 
 int read_device_sn(void *buf,int len )
@@ -718,6 +761,42 @@ static void device_comps_output_debug_info(device_comps_t const *const this)
 }
 
 
+int get_gps_info_from_net(char const *loc)
+{
+    char *endptr;
+    long  glat;
+    long  glng;
+    
+    glat=strtol(loc,     &endptr,10)*100000;
+    if(glat<0)
+    {
+       glat=glat+(-strtol(endptr+1,&endptr,10));
+    }
+    else
+    {
+        glat=glat+strtol(endptr+1,&endptr,10);
+    }
+    
+    glng=strtol(endptr+1,&endptr,10)*100000;
+    if(glng<0)
+    {
+        glng=glng+(-strtol(endptr+1,&endptr,10));
+    }
+    else
+    {
+        glng=glng+strtol(endptr+1,&endptr,10);
+    }
+    if(glat==0 && glng==0)
+    {
+        return 1;
+    }
+    
+    device_comps.gps.glat=glat;
+    device_comps.gps.glng=glng;
+    device_comps.gps.cs=Check_Sum_5A(&device_comps.gps, &device_comps.gps.cs-(unsigned char *)&device_comps.gps);
+    device_comps.save_gps_loc(&device_comps.gps,sizeof(device_comps.gps));
+    return 0;
+}
 
 
 static unsigned char device_comps_init(device_comps_t *const this)
@@ -958,17 +1037,37 @@ static void read_all_param(struct _DEVICE_COMPONENTS  *const this)
         {
             if(device_comps.access_param.cs!=Check_Sum_5A(&device_comps.access_param, &device_comps.access_param.cs-(unsigned char *)&device_comps.access_param))
             {
-                access_param_t default_access_param=
-                {
-                   {0},
-                    0,
-                    "",
-                    0,//flag
-                    0,
-                };
-                 memcpy(&device_comps.access_param,&default_access_param,sizeof(device_comps.access_param));
+                memset(&device_comps.access_param,0,sizeof(device_comps.access_param));
             }
-         }
+        }
+        if(!read_gps_loc(&device_comps.gps,sizeof(device_comps.gps)))
+        {
+            if(device_comps.gps.cs!=Check_Sum_5A(&device_comps.gps, &device_comps.gps.cs-(unsigned char *)&device_comps.gps))
+            {
+                memset(&device_comps.gps,0,sizeof(device_comps.gps));
+            }
+        }
+        if(!read_manufacturer_info(&device_comps.manufacturer_info,sizeof(device_comps.manufacturer_info)))
+        {
+            if(device_comps.manufacturer_info.cs!=Check_Sum_5A(&device_comps.manufacturer_info, &device_comps.manufacturer_info.cs-(unsigned char *)&device_comps.manufacturer_info))
+            {
+                memset(&device_comps.manufacturer_info,0,sizeof(device_comps.manufacturer_info));
+            }
+        }
+        if(!read_device_info(&device_comps.device_info,sizeof(device_comps.device_info)))
+        {
+            if(device_comps.device_info.cs!=Check_Sum_5A(&device_comps.device_info, &device_comps.device_info.cs-(unsigned char *)&device_comps.device_info))
+            {
+                memset(&device_comps.device_info,0,sizeof(device_comps.device_info));
+            }
+        }
+        if(!read_sensor_info(&device_comps.sensor_info,sizeof(device_comps.sensor_info)))
+        {
+            if(device_comps.sensor_info.cs!=Check_Sum_5A(&device_comps.sensor_info, &device_comps.sensor_info.cs-(unsigned char *)&device_comps.sensor_info))
+            {
+                memset(&device_comps.sensor_info,0,sizeof(device_comps.sensor_info));
+            }
+        }
          //device_comps.access_param.domain_name[48]=0;//add '\0'
     }
     else
@@ -977,7 +1076,7 @@ static void read_all_param(struct _DEVICE_COMPONENTS  *const this)
         device_comps.res_calibration_param.is_calibrated=0;
         device_comps.high_calibration_param.is_calibrated=0;
     }
-    device_comps.access_param.domain_name[48]=0;//add '\0'
+    
 }
 
 //only use the highlow and low_upper 
@@ -1453,7 +1552,45 @@ device_comps_t device_comps=
     read_device_coe,
     save_device_coe,  
     clr_press,
-    
+
+    {    //    struct 
+        //      {
+        //          long glng;
+        //          long glat;
+      0  //          unsigned char isLocSuc;
+        //          unsigned char cs;
+     },  //      }gps;
+      read_gps_loc, //      int (*read_gps_loc)(void *,int );
+      save_gps_loc,   //    int (*save_gps_loc)(void const *,int);
+      get_gps_info_from_net,//int (*get_gps_info_from_net)(char const *);
+
+     {     //struct 
+           //{
+      ""      //   char name[26];
+            //   unsigned char cs;
+     },      //}manufacturer_info;
+     read_manufacturer_info,     //int (*read_manufacturer_info)(void *,int );
+     save_manufacturer_info,      //int (*save_manufacturer_info)(void const *,int);
+        
+      {     //struct 
+           //{
+      ""      //   char type[26];
+             //  char id[26];
+             //  unsigned char cs;
+      },     //}device_info;
+      read_device_info,     //int (*read_device_info)(void *,int );
+      save_device_info,     //int (*save_device_info)(void const *,int);
+        
+      {     //struct 
+          // {
+       ""     //   char id[26];
+            //   unsigned char cs;
+      },     //}sensor_info;
+      read_sensor_info,     //int (*read_sensor_info)(void *,int );
+      save_sensor_info,     //int (*save_sensor_info)(void const *,int);
+
+
+ 
     0,//     unsigned int batt;//batt voltage
 
     {{0},{0},{0},0,0,0,0}, //struct calibration_param 

@@ -335,13 +335,24 @@ static void MD_DISPLAY_WRITE_D3_0(unsigned char a)  //  D02  H   L
 
 static void display_line3_data()//display 3th line data
 {
-    MD_DISPLAY_WRITE_D3_5(hum_comps.dig3_5);
-    MD_DISPLAY_WRITE_D3_4(hum_comps.dig3_4);
-    MD_DISPLAY_WRITE_D3_3(hum_comps.dig3_3);
-    MD_DISPLAY_WRITE_D3_2(hum_comps.dig3_2);
-    MD_DISPLAY_WRITE_D3_1(hum_comps.dig3_1);
-    MD_DISPLAY_WRITE_D3_0(hum_comps.dig3_0);
-  
+   #define MD_DIS_ALL_3_LINE_DATA (MD_DISPLAY_WRITE_D3_5(hum_comps.dig3_5),MD_DISPLAY_WRITE_D3_4(hum_comps.dig3_4),MD_DISPLAY_WRITE_D3_3(hum_comps.dig3_3),MD_DISPLAY_WRITE_D3_2(hum_comps.dig3_2),MD_DISPLAY_WRITE_D3_1(hum_comps.dig3_1),MD_DISPLAY_WRITE_D3_0(hum_comps.dig3_0))
+   #define MD_HID_ALL_3_LINE_DATA (MD_DISPLAY_WRITE_D3_5(MD_HIDE_DISP)    ,MD_DISPLAY_WRITE_D3_4(MD_HIDE_DISP)    ,MD_DISPLAY_WRITE_D3_3(MD_HIDE_DISP)    ,MD_DISPLAY_WRITE_D3_2(MD_HIDE_DISP)    ,MD_DISPLAY_WRITE_D3_1(MD_HIDE_DISP)    ,MD_DISPLAY_WRITE_D3_0(MD_HIDE_DISP)    )
+   if(hum_comps.cursor_3>-1)
+   {
+        MD_DISPLAY_WRITE_D3_5(hum_comps.dig3_5);
+        MD_DISPLAY_WRITE_D3_4(hum_comps.dig3_4);
+        MD_DISPLAY_WRITE_D3_3(hum_comps.dig3_3);
+        MD_DISPLAY_WRITE_D3_2(hum_comps.dig3_2);
+        MD_DISPLAY_WRITE_D3_1(hum_comps.dig3_1);
+        MD_DISPLAY_WRITE_D3_0(hum_comps.dig3_0);
+   }
+   else
+   {
+   
+ ((hum_comps.cursor_3==-1)&&(hum_comps.dis_oper_mark._bit.cur3))?((hum_comps.dis_oper_mark._bit.dis3)?MD_DIS_ALL_3_LINE_DATA                  :MD_HID_ALL_3_LINE_DATA             ):MD_DIS_ALL_3_LINE_DATA;
+   }
+   #undef MD_DIS_ALL_3_LINE_DATA
+   #undef MD_HID_ALL_3_LINE_DATA
 
 }
 static void display_line2_data()//display 0th line data
@@ -1204,10 +1215,27 @@ static long pwr(int n)
     {
         return 10000;
     }
+    if(n==5)
+    {
+        return 100000;
+    }
     return 1;
 }
 
 
+void calc_seg_value(unsigned char *dig,const int len,long num)
+{
+    int i=0;
+    if(len==0)
+    {
+        dig[0]=0x0e;
+        return;
+    }
+    for(i=0;i<len;i++)
+    {
+        dig[i]=num/pwr(i)%10;
+    }
+}
 void  display_opt(int opt)
 {
     //hum_comps.dig0_0=MD_HIDE_DISP;
@@ -1224,32 +1252,20 @@ void display_temp_adc(void)
     {
          long num=device_comps.temp_p_temp_n_average_result; 
          int i=0;
-            switch(num<0)
-            {
-                case 1: num=-num;
-                    hum_comps.dig1_0=num%10;
-                    hum_comps.dig1_1=num/10%10;
-                    hum_comps.dig1_2=num/100%10;
-                    hum_comps.dig1_3=MD_HIDE_DISP-1;
-                    hum_comps.dot1_pos=0;//
-                    hum_comps.dig0_0=MD_HIDE_DISP;
-                    ;
-                    hum_comps.dot0_pos=0;// 
-                    break;
-                
-                case 0:
-                    hum_comps.dig1_0=num%10;
-                    hum_comps.dig1_1=num/10%10;
-                    hum_comps.dig1_2=num/100%10;
-                    hum_comps.dig1_3=num/1000%10;
-                    hum_comps.dot1_pos=0;//
-                    hum_comps.dig0_0=MD_HIDE_DISP;
-                    hum_comps.dot0_pos=0;//
-                    break;
-                default:
-                    break;
-           }
-           hum_comps.dis_oper_mark._bit.refresh_temp_adc=0;
+         if(num<0)
+    	 {
+             num=-num;
+             hum_comps.dig1_3=MD_HIDE_DISP-1;
+             calc_seg_value(&hum_comps.dig1_0,3,num);
+             
+    	 }
+    	 else
+    	 {
+    	     calc_seg_value(&hum_comps.dig1_0,4,num);
+            
+	     }
+	     hum_comps.dot1_pos=0;
+         hum_comps.dis_oper_mark._bit.refresh_temp_adc=0;
     }
   
    
@@ -1276,8 +1292,7 @@ void display_temp_adc(void)
             }
         }
     }
-      display_line1_data();
-      display_line0_data();
+    display_line1_data();
 
 }
 
@@ -1287,34 +1302,21 @@ void display_press_adc(void)
    {
         long num=device_comps.ad1_ad2_average_result; 
         int i=0;
-        switch(num<0)
-        {
-            case 1: num=-num;
-                hum_comps.dig1_0=num%10;
-                hum_comps.dig1_1=num/10%10;
-                hum_comps.dig1_2=num/100%10;
-                hum_comps.dig1_3=MD_HIDE_DISP-1;
-                hum_comps.dot1_pos=0;//
-                hum_comps.dig0_0=MD_HIDE_DISP;
-                hum_comps.dot0_pos=0;// 
-                break;
+        
+         if(num<0)
+    	 {
+             num=-num;
+             hum_comps.dig1_3=MD_HIDE_DISP-1;
+             calc_seg_value(&hum_comps.dig1_0,3,num);
+             
+    	 }
+    	 else
+    	 {
+    	     calc_seg_value(&hum_comps.dig1_0,4,num);
             
-            case 0:
-                hum_comps.dig1_0=num%10;
-                hum_comps.dig1_1=num/10%10;
-                hum_comps.dig1_2=num/100%10;
-                hum_comps.dig1_3=num/1000%10;
-                hum_comps.dot1_pos=0;//
-                hum_comps.dig0_0=MD_HIDE_DISP;
-                hum_comps.dot0_pos=0;// 
-               
-               
-              
-                break;
-            default:
-                break;
-       }
-      hum_comps.dis_oper_mark._bit.refresh_press_adc=0;
+	     }
+	     hum_comps.dot1_pos=0;
+        hum_comps.dis_oper_mark._bit.refresh_press_adc=0;
   }
    
     if(device_comps.sw._bit.adc_stb)
@@ -1341,7 +1343,7 @@ void display_press_adc(void)
         }
     }
       display_line1_data();
-      display_line0_data();
+     
 }
 
 void display_high_adc(void)
@@ -1350,35 +1352,22 @@ void display_high_adc(void)
    {
         long num=device_comps.high_p_high_n_average_result; 
         int i=0;
-        switch(num<0)
-        {
-            case 1: num=-num;
-                hum_comps.dig1_0=num%10;
-                hum_comps.dig1_1=num/10%10;
-                hum_comps.dig1_2=num/100%10;
-                hum_comps.dig1_3=MD_HIDE_DISP-1;
-                hum_comps.dot1_pos=0;//
-                hum_comps.dig0_0=MD_HIDE_DISP;
-                hum_comps.dot0_pos=0;// 
-                break;
+        if(num<0)
+    	 {
+             num=-num;
+             hum_comps.dig1_3=MD_HIDE_DISP-1;
+             calc_seg_value(&hum_comps.dig1_0,3,num);
+             
+    	 }
+    	 else
+    	 {
+    	     calc_seg_value(&hum_comps.dig1_0,4,num);
             
-            case 0:
-                hum_comps.dig1_0=num%10;
-                hum_comps.dig1_1=num/10%10;
-                hum_comps.dig1_2=num/100%10;
-                hum_comps.dig1_3=num/1000%10;
-                hum_comps.dot1_pos=0;//
-                hum_comps.dig0_0=MD_HIDE_DISP;
-                hum_comps.dot0_pos=0;// 
-               
-               
-              
-                break;
-            default:
-                break;
-       }
-      hum_comps.dis_oper_mark._bit.refresh_high_adc=0;
-  }
+	     }
+	     hum_comps.dot1_pos=0;
+
+        hum_comps.dis_oper_mark._bit.refresh_high_adc=0;
+    }
    
     if(device_comps.sw._bit.adc_stb)
     {
@@ -1403,8 +1392,8 @@ void display_high_adc(void)
             }
         }
     }
-      display_line1_data();
-      display_line0_data();
+    display_line1_data();
+     
 }
 
 static void display_high(int index)
@@ -1426,15 +1415,21 @@ static void display_high(int index)
     if(hum_comps.dis_oper_mark._bit.refresh_high)
     {
         long num=device_comps.current_high/10;
-        hum_comps.dig2_0=num%10;
-        hum_comps.dig2_1=num/10%10;
-        hum_comps.dig2_2=num/100%10;
-        hum_comps.dig2_3=num/1000%10;
-        hum_comps.dig2_4=num/10000%10;
-        hum_comps.dig2_5=num/100000%10;
-       
+
+        if(num<0)
+		{
+		    num=-num;
+		    hum_comps.dig2_5=MD_HIDE_DISP-1;
+		}
+		else
+		{
+            hum_comps.dig2_5=MD_HIDE_DISP;
+		}
+	    calc_seg_value(&hum_comps.dig2_0,5,num);
+
         hum_comps.dot2_pos=device_comps.high_calibration_param.dot-1;// 0.0000
-        hide_zero(&hum_comps.dig2_5,6,hum_comps.dot2_pos+1);
+        hide_zero(&hum_comps.dig2_4,5,hum_comps.dot2_pos+1);
+        
         MD_HIDE_T6_CELSIUS;
         MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;
         MD_DIS_T7_M;
@@ -1463,16 +1458,11 @@ static void display_volume(int index)
     if(hum_comps.dis_oper_mark._bit.refresh_volume)
     {
         long num=device_comps.current_volume/pwr(device_comps.high_calibration_param.dot-1);
-        hum_comps.dig2_0=num%10;
-        hum_comps.dig2_1=num/10%10;
-        hum_comps.dig2_2=num/100%10;
-        hum_comps.dig2_3=num/1000%10;
-        hum_comps.dig2_4=num/10000%10;
-        hum_comps.dig2_5=num/100000%10;
-        
+
+	    calc_seg_value(&hum_comps.dig2_0,6,num);
         hum_comps.dot2_pos=3;// 0.000
         hide_zero(&hum_comps.dig2_5,6,hum_comps.dot2_pos+1);
-         MD_HIDE_T6_CELSIUS;
+        MD_HIDE_T6_CELSIUS;
         MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;
         display_line2_data(); 
 	    hum_comps.dis_oper_mark._bit.refresh_volume=0;
@@ -1481,12 +1471,7 @@ static void display_volume(int index)
 static void display_bottom_s(int index)
 {
         long num=device_comps.float_level_param.bottom_s;
-        hum_comps.dig2_0=num%10;
-        hum_comps.dig2_1=num/10%10;
-        hum_comps.dig2_2=num/100%10;
-        hum_comps.dig2_3=num/1000%10;
-        hum_comps.dig2_4=num/10000%10;
-        hum_comps.dig2_5=num/100000%10;
+        calc_seg_value(&hum_comps.dig2_0,6,num);
        
         hum_comps.dot2_pos=3;// 0.0000
         hide_zero(&hum_comps.dig2_5,6,hum_comps.dot2_pos+1);
@@ -1495,358 +1480,29 @@ static void display_bottom_s(int index)
         display_line2_data(); 
 }
 
-void display_press(int index)
-{
-    if(device_comps.calibration_param.is_calibrated)
-    {
-        switch(index)
-        {
-            case 0:
-                if(hum_comps.dis_oper_mark._bit.refresh_press)
-                {
-                      if(device_comps.calibration_param.unit==0)//Mpa
-                      {
-                            long num=device_comps.current_press/10;
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                            MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T5_MPA;
-                            if(device_comps.calibration_param.dot==5)
-                            {
-                                 hide_zero(&hum_comps.dig2_5,6,5);
-                                hum_comps.dot2_pos=4;// 0.0000
-                            }
-                            else if(device_comps.calibration_param.dot==4)
-                            {
-                                 hide_zero(&hum_comps.dig2_5,6,4);
-                                 hum_comps.dot2_pos=3;// 0.000
-                            }
-
-                      }
-                      else if(device_comps.calibration_param.unit==1)//Kpa
-                      {
-                            long num=device_comps.current_press/10;
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                            MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T2_KPA;
-                            if(device_comps.calibration_param.dot==3)
-                            {
-                                 hide_zero(&hum_comps.dig2_5,6,3);
-                                hum_comps.dot2_pos=2;// 0.00
-                            }
-                      }
-                      else if(device_comps.calibration_param.unit==0x81)//Kpa unit m
-                      {
-                            long num=device_comps.current_press/10/10;
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                            MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T7_M;
-                            if(device_comps.calibration_param.dot==3)
-                            {
-                                 hide_zero(&hum_comps.dig2_5,6,3);
-                                hum_comps.dot2_pos=2;// 0.00m
-                            }
-                      }
-                      hum_comps.dis_oper_mark._bit.refresh_press=0;
-                }
-                if(!device_comps.sw._bit.over_range)
-                {
-                    hum_comps.dis_oper_mark._bit.cur2=0;
-                }
-                else
-                {
-                    hum_comps.dis_oper_mark._bit.cur2=1;
-                    hum_comps.cursor_2=-1;
-                    hum_comps.cursor_2_count++;
-            		if(hum_comps.cursor_2_count>9)
-            		{
-            		    hum_comps.cursor_2_count=0;
-            			if(hum_comps.dis_oper_mark._bit.dis2)
-            			{
-            				hum_comps.dis_oper_mark._bit.dis2=0;
-            				//hum_comps.dot2_pos=0;//
-            			}
-            			else
-            			{
-                           hum_comps.dis_oper_mark._bit.dis2=1;
-            			}
-            		}
-                }
-                display_line2_data();    // 
-                break;
-
-            case 1:
-                if(hum_comps.dis_oper_mark._bit.refresh_press)
-                {
-                      if(device_comps.calibration_param.unit==0)//Mpa->Kpa
-                      {
-                           long num=device_comps.current_press/10;
-                             hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                             MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T2_KPA;
-                            if(device_comps.calibration_param.dot==5)
-                            {
-                                 hide_zero(&hum_comps.dig2_5,6,2);
-                                hum_comps.dot2_pos=1;// 0.0000
-                            }
-                            else if(device_comps.calibration_param.dot==4)
-                            {
-                                 hide_zero(&hum_comps.dig2_5,6,1);
-                                 hum_comps.dot2_pos=0;// 0
-                            }
-
-                      }
-                      else if(device_comps.calibration_param.unit==1)//Kpa->Mpa
-                      {
-                            long num=device_comps.current_press/10;
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                            MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T5_MPA;
-                            if(device_comps.calibration_param.dot==3)
-                            {
-                                 hide_zero(&hum_comps.dig2_5,6,6);
-                                hum_comps.dot2_pos=5;// 0.00000
-                            }
-                      }
-                      else if(device_comps.calibration_param.unit==0x81)//Kpa unit m->Kpa
-                      {
-                          long num=device_comps.current_press/10;
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                            MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T2_KPA;
-                            if(device_comps.calibration_param.dot==3)
-                            {
-                                hide_zero(&hum_comps.dig2_5,6,3);
-                                hum_comps.dot2_pos=2;// 0.00m
-                            }
-                      }
-                      hum_comps.dis_oper_mark._bit.refresh_press=0;
-                }
-                if(!device_comps.sw._bit.over_range)
-                {
-                    hum_comps.dis_oper_mark._bit.cur2=0;
-                }
-                else
-                {
-                    hum_comps.dis_oper_mark._bit.cur2=1;
-                    hum_comps.cursor_2=-1;
-                    hum_comps.cursor_2_count++;
-                    if(hum_comps.cursor_2_count>9)
-                    {
-                        hum_comps.cursor_2_count=0;
-                        if(hum_comps.dis_oper_mark._bit.dis2)
-                        {
-                            hum_comps.dis_oper_mark._bit.dis2=0;
-                            //hum_comps.dot2_pos=0;//
-                        }
-                        else
-                        {
-                           hum_comps.dis_oper_mark._bit.dis2=1;
-                        }
-                    }
-                }
-                display_line2_data();    // 
-                break;
-
-            case 2:
-                if(hum_comps.dis_oper_mark._bit.refresh_press)
-                {
-                      if(device_comps.calibration_param.unit==0)//Mpa->m
-                      {
-    					   long num=0;
-                           if(device_comps.calibration_param.dot==5)
-                           {
-                                num=device_comps.current_press/10;
-                           }
-                           else if(device_comps.calibration_param.dot==4)
-                           {
-                                num=device_comps.current_press;
-                           }
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                            MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T7_M;
-                            hide_zero(&hum_comps.dig2_5,6,3);
-                            hum_comps.dot2_pos=2;// 0.00m
-
-                      }
-                      else if(device_comps.calibration_param.unit==1)//Kpa->m
-                      {
-                            long num=device_comps.current_press/10/10;
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                           MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T7_M;       
-                            if(device_comps.calibration_param.dot==3)
-                            {
-                                hide_zero(&hum_comps.dig2_5,6,3);
-                                hum_comps.dot2_pos=2;// 0.00m
-                            }
-                      }
-                      else if(device_comps.calibration_param.unit==0x81)//Kpa unit m->Mpa
-                      {
-                            long num=device_comps.current_press/10;
-                            hum_comps.dig2_0=num%10;
-                            hum_comps.dig2_1=num/10%10;
-                            hum_comps.dig2_2=num/100%10;
-                            hum_comps.dig2_3=num/1000%10;
-                            hum_comps.dig2_4=num/10000%10;
-                            hum_comps.dig2_5=num/100000%10;
-                            MD_HIDE_T5_MPA;MD_HIDE_T2_KPA;MD_HIDE_T7_M;MD_DIS_T5_MPA; 
-                            if(device_comps.calibration_param.dot==3)
-                            {
-                                hide_zero(&hum_comps.dig2_5,6,6);
-                                hum_comps.dot2_pos=5;// 0.00000
-                            }
-                      }
-                      hum_comps.dis_oper_mark._bit.refresh_press=0;
-                }
-                if(!device_comps.sw._bit.over_range)
-                {
-                    hum_comps.dis_oper_mark._bit.cur2=0;
-                }
-                else
-                {
-                    hum_comps.dis_oper_mark._bit.cur2=1;
-                    hum_comps.cursor_2=-1;
-                    hum_comps.cursor_2_count++;
-                    if(hum_comps.cursor_2_count>9)
-                    {
-                        hum_comps.cursor_2_count=0;
-                        if(hum_comps.dis_oper_mark._bit.dis2)
-                        {
-                            hum_comps.dis_oper_mark._bit.dis2=0;
-                            //hum_comps.dot2_pos=0;//
-                        }
-                        else
-                        {
-                           hum_comps.dis_oper_mark._bit.dis2=1;
-                        }
-                    }
-                }
-                display_line2_data();    // 
-                break;
-       }
-   }
-   else
-   {
-        if(hum_comps.dis_oper_mark._bit.refresh_press)
-        {
-             hum_comps.dis_oper_mark._bit.cur2=0;
-            hum_comps.dig2_0=MD_HIDE_DISP-1;
-            hum_comps.dig2_1=MD_HIDE_DISP-1;
-            hum_comps.dig2_2=MD_HIDE_DISP-1;
-            hum_comps.dig2_3=MD_HIDE_DISP-1;
-            hum_comps.dig2_4=MD_HIDE_DISP-1;
-            hum_comps.dig2_5=MD_HIDE_DISP-1;
-            hum_comps.dot2_pos=0;
-            hum_comps.dis_oper_mark._bit.refresh_press=0;
-            display_line2_data();  
-        }
-   }                
-}            
 
 void display_temp()//refresh temperature
 {
 	unsigned char dot_pos=0;
 	long num=device_comps.current_temp;
+	hum_comps.dot1_pos=1;
+     if(num<0)
+	 {
+         num=-num;
+         hum_comps.dig1_3=MD_HIDE_DISP-1;
+         calc_seg_value(&hum_comps.dig1_0,3,num);
+         hide_zero(&hum_comps.dig1_2,3,hum_comps.dot1_pos+1);
+	 }
+	 else
+	 {
+	     calc_seg_value(&hum_comps.dig1_0,4,num);
+         hide_zero(&hum_comps.dig1_3,4,hum_comps.dot1_pos+1);
+	 }
+	 
 	 MD_DIS_T10_CELSIUS;
-	switch(num<0)
-	{
-		case 1: num=-num;
-			if(num<100)
-			{
-				hum_comps.dig1_0=num%10;
-				hum_comps.dig1_1=num/10%10;
-				hum_comps.dot1_pos=1;//                                                                
-				hum_comps.dig1_2=MD_HIDE_DISP-1;//dis -  
-				hum_comps.dig1_3=MD_HIDE_DISP;//dis -  
-			}
-			else if(num<1000)
-			{
-			    hum_comps.dig1_0=num%10;
-				hum_comps.dig1_1=num/10%10;
-				hum_comps.dig1_2=num/100%10;
-				hum_comps.dot1_pos=1;
-				hum_comps.dig1_3=MD_HIDE_DISP-1;//dis -  
-			}
-			else
-			{
-				hum_comps.dig1_0=MD_HIDE_DISP;
-				hum_comps.dig1_1=MD_HIDE_DISP;
-				hum_comps.dig1_2=MD_HIDE_DISP;// Overrange display - _ _
-				hum_comps.dig1_3=MD_HIDE_DISP-1;
-				hum_comps.dot1_pos=0;
-			}
-			break;
-		
-		case 0:
-			if(num<100)
-			{
-				hum_comps.dig1_0=num%10;
-				hum_comps.dig1_1=num/10%10;
-				hum_comps.dot1_pos=1;//P2    
-				hum_comps.dig1_2=MD_HIDE_DISP;
-				hum_comps.dig1_3=MD_HIDE_DISP;
-			}
-			else if(num<1000)
-			{
-				hum_comps.dig1_0=num%10;
-				hum_comps.dig1_1=num/10%10;
-				hum_comps.dot1_pos=1;//P2     
-				hum_comps.dig1_2=num/100%10;
-				hum_comps.dig1_3=MD_HIDE_DISP;
-			}
-			else if(num<10000)
-			{
-				hum_comps.dig1_0=num%10;
-				hum_comps.dig1_1=num/10%10;
-				hum_comps.dig1_2=num/100%10;
-				hum_comps.dig1_3=num/1000%10;
-				hum_comps.dot1_pos=1;//  
-			}
-			else   // Overrange display 1_ _
-			{
-				hum_comps.dig1_0=MD_HIDE_DISP;
-				hum_comps.dig1_1=MD_HIDE_DISP;
-				hum_comps.dig1_2=MD_HIDE_DISP;
-				hum_comps.dig1_3=1;
-				hum_comps.dot1_pos=0;
-		    }
-			break;
-		default:
-			break;
-	}
-	display_line1_data();//display 1 line data
+	 
+	 hum_comps.dis_oper_mark._bit.cur1=0;
+	 display_line1_data();//display 1 line data
 }
 
 
@@ -2062,14 +1718,19 @@ static void normal_mode_display(unsigned char opt)
                                   break;
                  }
           }
+
+          if(num<0)
+          {
+            num=-num;
+	        hum_comps.dig2_5=MD_HIDE_DISP-1;
+          }
+    	  else
+    	  {
+    		 hum_comps.dig2_5=MD_HIDE_DISP;  
+    	  }
+    	  calc_seg_value(&hum_comps.dig2_0,5,num);
+          hide_zero(&hum_comps.dig2_4,5,hum_comps.dot2_pos+1);
           
-          hum_comps.dig2_0=num%10;
-          hum_comps.dig2_1=num/10%10;
-          hum_comps.dig2_2=num/100%10;
-          hum_comps.dig2_3=num/1000%10;
-          hum_comps.dig2_4=num/10000%10;
-          hum_comps.dig2_5=num/100000%10;
-          hide_zero(&hum_comps.dig2_5,6,hum_comps.dot2_pos+1);
           hum_comps.dis_oper_mark._bit.refresh_press=0;
        }
        
@@ -2123,29 +1784,27 @@ static void normal_mode_display(unsigned char opt)
         {
              num=normal_mode_Kpa_switch(device_comps.max_press,n,&dis_dot,opt,&dis_opt);
         }
+        if(num<0)
+        {
+            num=-num;
+	        hum_comps.dig3_5=MD_HIDE_DISP-1;
+        }
+    	else 
+    	{
+    		hum_comps.dig3_5=MD_HIDE_DISP;
+    	}
         hum_comps.dot3_pos=dis_dot;
         if(hum_comps.dot3_pos==4)
         {
-            hum_comps.dot3_pos+=1;
-            hum_comps.dig3_0=MD_HIDE_DISP;
-            hum_comps.dig3_1=num%10;
-            hum_comps.dig3_2=num/10%10;
-            hum_comps.dig3_3=num/100%10;
-            hum_comps.dig3_4=num/1000%10;
-            hum_comps.dig3_5=num/10000%10;
+            hum_comps.dot3_pos=3;
+            num/=10;
         }
-        else
-        {
-            hum_comps.dig3_0=num%10;
-            hum_comps.dig3_1=num/10%10;
-            hum_comps.dig3_2=num/100%10;
-            hum_comps.dig3_3=num/1000%10;
-            hum_comps.dig3_4=num/10000%10;
-            hum_comps.dig3_5=num/100000%10;
-        }
-        MD_DIS_T11_MAX;
-        hide_zero(&hum_comps.dig3_5,6,hum_comps.dot3_pos+1);
+        calc_seg_value(&hum_comps.dig3_0,5,num);
+        
+         MD_DIS_T11_MAX;
+        hide_zero(&hum_comps.dig3_4,5,hum_comps.dot3_pos+1);
         hum_comps.dis_oper_mark._bit.refresh_press_max=0;
+        hum_comps.dis_oper_mark._bit.cur3=0;
         display_line3_data();
     }
      
@@ -2167,31 +1826,18 @@ static void debug_mode_display(unsigned char opt)
     	{
             num=device_comps.ad1_ad2_average_result; 
  			//	device_comps.output_debug_info(&device_comps);
-    	    switch(num<0)
-            {
-                case 1: num=-num;
-                    hum_comps.dig2_0=num%10;
-                    hum_comps.dig2_1=num/10%10;
-                    hum_comps.dig2_2=num/100%10;
-                    hum_comps.dig2_3=num/1000%10;
-                    hum_comps.dig2_4=num/10000%10;
-                    hum_comps.dig2_5=MD_HIDE_DISP-1;
-                    hum_comps.dot2_pos=0;//  
-                    break;
-                
-                case 0:
-                    hum_comps.dig2_0=num%10;
-                    hum_comps.dig2_1=num/10%10;
-                    hum_comps.dig2_2=num/100%10;
-                    hum_comps.dig2_3=num/1000%10;
-                    hum_comps.dig2_4=num/10000%10;
-                    hum_comps.dig2_5=MD_HIDE_DISP;
-                    hum_comps.dot2_pos=0;//  
-                    break;
-                default:
-                    break;
-            }
-    		 hum_comps.dis_oper_mark._bit.refresh_press_adc=0;
+ 			if(num<0)
+ 			{
+ 			    num=-num;
+ 			    hum_comps.dig2_5=MD_HIDE_DISP-1;
+ 			}
+ 			else
+ 			{
+                hum_comps.dig2_5=MD_HIDE_DISP;
+ 			}
+ 			hum_comps.dot2_pos=0;
+ 			calc_seg_value(&hum_comps.dig2_0,5,num);
+            hum_comps.dis_oper_mark._bit.refresh_press_adc=0;
     	}
 
 
@@ -2224,76 +1870,55 @@ static void debug_mode_display(unsigned char opt)
     	if(hum_comps.dis_oper_mark._bit.refresh_temp_adc)
     	{
     	    num=device_comps.temp_p_temp_n_average_result; 
-       		switch(num<0)
-            {
-                case 1: num=-num;
-                    hum_comps.dig1_0=num%10;
-                    hum_comps.dig1_1=num/10%10;
-                    hum_comps.dig1_2=num/100%10;
-                    hum_comps.dig1_3=num/1000%10;
-                    hum_comps.dot1_pos=0;//
-                    hum_comps.dig0_0=num/10000%10;
-                    hum_comps.dig0_1=MD_HIDE_DISP-1;
-                    hum_comps.dot0_pos=0;// 
-                    break;
-                
-                case 0:
-                    hum_comps.dig1_0=num%10;
-                    hum_comps.dig1_1=num/10%10;
-                    hum_comps.dig1_2=num/100%10;
-                    hum_comps.dig1_3=num/1000%10;
-                    hum_comps.dot1_pos=0;//
-                    hum_comps.dig0_0=num/10000%10;
-                    hum_comps.dig0_1=MD_HIDE_DISP;
-                    hum_comps.dot0_pos=0;// 
-                    break;
-                default:
-                    break;
-           }
+       		if(num<0)
+ 			{
+ 			    num=-num;
+ 			    hum_comps.dig3_5=MD_HIDE_DISP-1;
+ 			}
+ 			else
+ 			{
+                hum_comps.dig3_5=MD_HIDE_DISP;
+ 			}
+ 			hum_comps.dot3_pos=0;
+ 			calc_seg_value(&hum_comps.dig3_0,5,num);
            hum_comps.dis_oper_mark._bit.refresh_temp_adc=0;
     	}
       
        
         if(device_comps.sw._bit.temp_adc_stb)
         {
-            hum_comps.dis_oper_mark._bit.cur1=0;
-            hum_comps.dis_oper_mark._bit.dis1=1;
+            hum_comps.dis_oper_mark._bit.cur3=0;
+            hum_comps.dis_oper_mark._bit.dis3=1;
         }
         else
         {
-            hum_comps.dis_oper_mark._bit.cur1=1;
-            hum_comps.cursor_1=-1;
-            hum_comps.cursor_1_count++;
-            if(hum_comps.cursor_1_count>4)
+            hum_comps.dis_oper_mark._bit.cur3=1;
+            hum_comps.cursor_3=-1;
+            hum_comps.cursor_3_count++;
+            if(hum_comps.cursor_3_count>4)
             {
-                hum_comps.cursor_1_count=0;
-                if(hum_comps.dis_oper_mark._bit.dis1)
+                hum_comps.cursor_3_count=0;
+                if(hum_comps.dis_oper_mark._bit.dis3)
                 {
-                    hum_comps.dis_oper_mark._bit.dis1=0;
+                    hum_comps.dis_oper_mark._bit.dis3=0;
                 }
                 else
                 {
-                   hum_comps.dis_oper_mark._bit.dis1=1;
+                   hum_comps.dis_oper_mark._bit.dis3=1;
                 }
             }
         }
-        display_line1_data();
-        display_line0_data();
+        display_line3_data();
+        
         break;
         
      case 1:
 	    num=device_comps.report_param.triggerTimes;
-        hum_comps.dig2_0=num%10;
-        hum_comps.dig2_1=num/10%10;
-        hum_comps.dig2_2=num/100%10;
-        hum_comps.dig2_3=num/1000%10;
-        hum_comps.dig2_4=num/10000%10;
-        hum_comps.dig2_5=num/100000%10;
         hum_comps.dot2_pos=0;//
-
-        hum_comps.dig3_0=num/1000000%10;
-        hum_comps.dig3_1=num/10000000%10;
-        hum_comps.dig3_2=num/100000000%10;
+        calc_seg_value(&hum_comps.dig2_0,6,num);
+        hum_comps.dig3_0=MD_HIDE_DISP-1;
+        hum_comps.dig3_1=MD_HIDE_DISP-1;
+        hum_comps.dig3_2=MD_HIDE_DISP-1;
         hum_comps.dig3_3=MD_HIDE_DISP-1;
         hum_comps.dig3_4=MD_DIS_r;
         hum_comps.dig3_5=MD_DIS_t;
@@ -2336,13 +1961,8 @@ static void param_query_mode_display(unsigned char opt)
     }
  	if(hum_comps.dis_oper_mark._bit.refresh_param_modifyed)   
 	{
-	    hum_comps.dig2_0=*(&device_comps.float_level_param.bottom_s+opt)%10;
-	    hum_comps.dig2_1=*(&device_comps.float_level_param.bottom_s+opt)/10%10;
-	    hum_comps.dig2_2=*(&device_comps.float_level_param.bottom_s+opt)/100%10;
-	    hum_comps.dig2_3=*(&device_comps.float_level_param.bottom_s+opt)/1000%10;
-	    hum_comps.dig2_4=*(&device_comps.float_level_param.bottom_s+opt)/10000%10;
-	    hum_comps.dig2_5=*(&device_comps.float_level_param.bottom_s+opt)/100000%10;
-		hum_comps.dot2_pos=3;
+        calc_seg_value(&hum_comps.dig2_0, 6, *(&device_comps.float_level_param.bottom_s+opt));
+	    hum_comps.dot2_pos=3;
 		display_line2_data();
 		hum_comps.dis_oper_mark._bit.refresh_param_modifyed=0;
 		
@@ -2358,15 +1978,10 @@ static void param_modify_mode_display(unsigned char opt)
         
         if(hum_comps.dis_oper_mark._bit.refresh_param_modifyed)   
 	    {
-	    hum_comps.dig2_0=*(&device_comps.float_level_param.bottom_s+opt)%10;
-	    hum_comps.dig2_1=*(&device_comps.float_level_param.bottom_s+opt)/10%10;
-	    hum_comps.dig2_2=*(&device_comps.float_level_param.bottom_s+opt)/100%10;
-	    hum_comps.dig2_3=*(&device_comps.float_level_param.bottom_s+opt)/1000%10;
-	    hum_comps.dig2_4=*(&device_comps.float_level_param.bottom_s+opt)/10000%10;
-	    hum_comps.dig2_5=*(&device_comps.float_level_param.bottom_s+opt)/100000%10;
-		hum_comps.dot2_pos=3;
-		display_line2_data();
-		hum_comps.dis_oper_mark._bit.refresh_param_modifyed=0;
+    	    calc_seg_value(&hum_comps.dig2_0, 6, *(&device_comps.float_level_param.bottom_s+opt));
+    		hum_comps.dot2_pos=3;
+    		display_line2_data();
+    		hum_comps.dis_oper_mark._bit.refresh_param_modifyed=0;
 		
      }
         if(hum_comps.dis_oper_mark._bit.cur2)
@@ -2567,12 +2182,7 @@ static void cal_query_mode_display(unsigned char opt)
         
         if(hum_comps.dis_oper_mark._bit.refresh_cal_param)
         {
-            hum_comps.dig2_0=device_comps.calibration_param.y[opt]%10;
-            hum_comps.dig2_1=device_comps.calibration_param.y[opt]/10%10;
-            hum_comps.dig2_2=device_comps.calibration_param.y[opt]/100%10;
-            hum_comps.dig2_3=device_comps.calibration_param.y[opt]/1000%10;
-            hum_comps.dig2_4=device_comps.calibration_param.y[opt]/10000%10;
-            hum_comps.dig2_5=device_comps.calibration_param.y[opt]/100000%10;
+            calc_seg_value(&hum_comps.dig2_0, 6,device_comps.calibration_param.y[opt]);
             hum_comps.dot2_pos=device_comps.calibration_param.dot;
             if((device_comps.calibration_param.unit&0x01)==0)
             {
@@ -2592,12 +2202,8 @@ static void cal_query_mode_display(unsigned char opt)
         display_temp_adc();
         if(hum_comps.dis_oper_mark._bit.refresh_res_cal_param)
         {
-            hum_comps.dig2_0=device_comps.res_calibration_param.y[opt]%10;
-            hum_comps.dig2_1=device_comps.res_calibration_param.y[opt]/10%10;
-            hum_comps.dig2_2=device_comps.res_calibration_param.y[opt]/100%10;
-            hum_comps.dig2_3=device_comps.res_calibration_param.y[opt]/1000%10;
-            hum_comps.dig2_4=device_comps.res_calibration_param.y[opt]/10000%10;
-            hum_comps.dig2_5=device_comps.res_calibration_param.y[opt]/100000%10;
+            
+            calc_seg_value(&hum_comps.dig2_0, 6,device_comps.res_calibration_param.y[opt]);
             hum_comps.dot2_pos=2;
             display_line2_data();
             hum_comps.dis_oper_mark._bit.refresh_res_cal_param=0;
@@ -2608,13 +2214,8 @@ static void cal_query_mode_display(unsigned char opt)
         display_high_adc();
         if(hum_comps.dis_oper_mark._bit.refresh_high_cal_param)
         {
-            hum_comps.dig2_0=device_comps.high_calibration_param.y[opt]%10;
-            hum_comps.dig2_1=device_comps.high_calibration_param.y[opt]/10%10;
-            hum_comps.dig2_2=device_comps.high_calibration_param.y[opt]/100%10;
-            hum_comps.dig2_3=device_comps.high_calibration_param.y[opt]/1000%10;
-            hum_comps.dig2_4=device_comps.high_calibration_param.y[opt]/10000%10;
-            hum_comps.dig2_5=device_comps.high_calibration_param.y[opt]/100000%10;
-            hum_comps.dot2_pos=device_comps.high_calibration_param.dot;
+            calc_seg_value(&hum_comps.dig2_0, 6, device_comps.high_calibration_param.y[opt]);
+             hum_comps.dot2_pos=device_comps.high_calibration_param.dot;
              MD_DIS_T7_M;
             display_line2_data();
             hum_comps.dis_oper_mark._bit.refresh_high_cal_param=0;
@@ -2637,12 +2238,7 @@ static void cal_modify_mode_display(unsigned char opt)
        
         if(hum_comps.dis_oper_mark._bit.refresh_cal_param)
         {
-            hum_comps.dig2_0=device_comps.calibration_param.y[opt]%10;
-            hum_comps.dig2_1=device_comps.calibration_param.y[opt]/10%10;
-            hum_comps.dig2_2=device_comps.calibration_param.y[opt]/100%10;
-            hum_comps.dig2_3=device_comps.calibration_param.y[opt]/1000%10;
-            hum_comps.dig2_4=device_comps.calibration_param.y[opt]/10000%10;
-            hum_comps.dig2_5=device_comps.calibration_param.y[opt]/100000%10;
+            calc_seg_value(&hum_comps.dig2_0, 6,device_comps.calibration_param.y[opt]);
             hum_comps.dot2_pos=device_comps.calibration_param_bak.dot;
             if((device_comps.calibration_param_bak.unit&0x01)==0)
             {
@@ -2661,12 +2257,7 @@ static void cal_modify_mode_display(unsigned char opt)
         display_temp_adc();
         if(hum_comps.dis_oper_mark._bit.refresh_res_cal_param)
         {
-			hum_comps.dig2_0=device_comps.res_calibration_param.y[opt]%10;
-            hum_comps.dig2_1=device_comps.res_calibration_param.y[opt]/10%10;
-            hum_comps.dig2_2=device_comps.res_calibration_param.y[opt]/100%10;
-            hum_comps.dig2_3=device_comps.res_calibration_param.y[opt]/1000%10;
-            hum_comps.dig2_4=device_comps.res_calibration_param.y[opt]/10000%10;
-            hum_comps.dig2_5=device_comps.res_calibration_param.y[opt]/100000%10;
+			calc_seg_value(&hum_comps.dig2_0, 6,device_comps.res_calibration_param.y[opt]);
             hum_comps.dot2_pos=2;
            // display_line2_data();
             hum_comps.dis_oper_mark._bit.refresh_res_cal_param=0;
@@ -2678,12 +2269,7 @@ static void cal_modify_mode_display(unsigned char opt)
         display_high_adc();
         if(hum_comps.dis_oper_mark._bit.refresh_high_cal_param)
         {
-	    hum_comps.dig2_0=device_comps.high_calibration_param.y[opt]%10;
-            hum_comps.dig2_1=device_comps.high_calibration_param.y[opt]/10%10;
-            hum_comps.dig2_2=device_comps.high_calibration_param.y[opt]/100%10;
-            hum_comps.dig2_3=device_comps.high_calibration_param.y[opt]/1000%10;
-            hum_comps.dig2_4=device_comps.high_calibration_param.y[opt]/10000%10;
-            hum_comps.dig2_5=device_comps.high_calibration_param.y[opt]/100000%10;
+	       calc_seg_value(&hum_comps.dig2_0, 6, device_comps.high_calibration_param.y[opt]);
             hum_comps.dot2_pos=device_comps.high_calibration_param_bak.dot;;
            // display_line2_data();
            MD_DIS_T7_M;
@@ -2902,14 +2488,10 @@ static iot_mode_display_press(unsigned char opt)
                                 break;
                  }
            }
-          hum_comps.dig2_0=num%10;
-          hum_comps.dig2_1=num/10%10;
-          hum_comps.dig2_2=num/100%10;
-          hum_comps.dig2_3=num/1000%10;
-          hum_comps.dig2_4=num/10000%10;
-          hum_comps.dig2_5=num/100000%10;
-          hide_zero(&hum_comps.dig2_5,6,hum_comps.dot2_pos+1);
-          hum_comps.dis_oper_mark._bit.refresh_press=0;
+           calc_seg_value(&hum_comps.dig2_0, 6,num);
+          
+           hide_zero(&hum_comps.dig2_5,6,hum_comps.dot2_pos+1);
+           hum_comps.dis_oper_mark._bit.refresh_press=0;
        }
        
         if(!device_comps.sw._bit.over_range)
@@ -3217,7 +2799,8 @@ static void lora_mode_display(unsigned char opt)
                             display_bottom_s(opt);
                             break;
                 	#else
-                            display_press(opt);
+                            
+                            iot_mode_display_press(opt);
                             break;
 			        #endif
                     
@@ -3357,11 +2940,8 @@ static void lora_mode_display(unsigned char opt)
 static void  display_ip(unsigned char opt)
 {
    int flag;
-   if(device_comps.access_param.flag==1)//ip 
-   {
-      flag=1;//fill ip
-   }
-   else if(device_comps.access_param.flag==2)//domain 
+   
+   if(netComps.net_info.currentIP_No<2)
    {
         if(netComps.St._bit.ResolvedIP)
         {
@@ -3382,13 +2962,13 @@ static void  display_ip(unsigned char opt)
    {
         case 0: 
           if(flag==1)    
-          {
-                hum_comps.dig3_0=device_comps.access_param.ip[2]&0x0f;
-                hum_comps.dig3_1=(device_comps.access_param.ip[2]>>4)&0x0f;
-                hum_comps.dig3_2=device_comps.access_param.ip[1]&0x0f;
-                hum_comps.dig3_3=(device_comps.access_param.ip[1]>>4)&0x0f;
-                hum_comps.dig3_4=device_comps.access_param.ip[0]&0x0f;
-                hum_comps.dig3_5=(device_comps.access_param.ip[0]>>4)&0x0f;
+          { 
+                hum_comps.dig3_0=netComps.net_info.ResolvedIP[2]&0x0f;
+                hum_comps.dig3_1=(netComps.net_info.ResolvedIP[2]>>4)&0x0f;
+                hum_comps.dig3_2=netComps.net_info.ResolvedIP[1]&0x0f;
+                hum_comps.dig3_3=(netComps.net_info.ResolvedIP[1]>>4)&0x0f;
+                hum_comps.dig3_4=netComps.net_info.ResolvedIP[0]&0x0f;
+                hum_comps.dig3_5=(netComps.net_info.ResolvedIP[0]>>4)&0x0f;
                 hum_comps.dot3_pos=2;//
           }
           else if(flag==2)
@@ -3401,7 +2981,7 @@ static void  display_ip(unsigned char opt)
           {
                 hum_comps.dig3_0=MD_DIS_p;
                 hum_comps.dig3_1=0x01;
-                hum_comps.dig3_2=MD_DIS_o;0x01;
+                hum_comps.dig3_2=MD_DIS_o;
                 hum_comps.dig3_3=MD_DIS_n;
                 hum_comps.dig3_4=hum_comps.dig3_5=MD_HIDE_DISP;
                 hum_comps.dot3_pos=2;//  
@@ -3411,12 +2991,22 @@ static void  display_ip(unsigned char opt)
         case 1:
           if(flag==1)    
           {
-                hum_comps.dig3_0=device_comps.access_param.port&0x0f;
-                hum_comps.dig3_1=(device_comps.access_param.port>>4)&0x0f;;
-                hum_comps.dig3_2=(device_comps.access_param.port>>8)&0x0f;
-                hum_comps.dig3_3=(device_comps.access_param.port>>12)&0x0f;
-                hum_comps.dig3_4=device_comps.access_param.ip[3]&0x0f;
-                hum_comps.dig3_5=(device_comps.access_param.ip[3]>>4)&0x0f;
+                unsigned int port=0;
+                if(netComps.net_info.currentIP_No==EM_IP0)
+                {
+                    port=device_comps.access_param.port;
+                }
+                else if(netComps.net_info.currentIP_No==EM_IP1)
+                {
+                    port=device_comps.access_param.port1;
+                }
+                
+                hum_comps.dig3_0=port&0x0f;
+                hum_comps.dig3_1=(port>>4)&0x0f;;
+                hum_comps.dig3_2=(port>>8)&0x0f;
+                hum_comps.dig3_3=(port>>12)&0x0f;
+                hum_comps.dig3_4=netComps.net_info.ResolvedIP[3]&0x0f;
+                hum_comps.dig3_5=(netComps.net_info.ResolvedIP[3]>>4)&0x0f;
                 hum_comps.dot3_pos=0;
                 
           }
@@ -3437,6 +3027,7 @@ static void  display_ip(unsigned char opt)
         default:
              break;
    }
+   hum_comps.dis_oper_mark._bit.cur3=0;
    display_line3_data();
 
 }
@@ -3465,30 +3056,89 @@ static void report_mode_display(unsigned char opt)
             hum_comps.dot2_pos=0;
             display_line2_data();
             break;
+        
         case EM_DIS_OFF:// suc   or fal
             hum_comps.dis_oper_mark._bit.cur2=0;
-            if(protocolComps.sw._bit.dataPushYet)
+            if(protocolComps.sw._bit.dataPushYet&&protocolComps.sw._bit.dataPushYet1)
             {
                 hum_comps.dig2_0=0x0c;
                 hum_comps.dig2_1=MD_DIS_U;
                 hum_comps.dig2_2=5;//s
-                hum_comps.dig2_3=MD_HIDE_DISP-1;
-                hum_comps.dig2_4=*netComps.run_st%10;
-                hum_comps.dig2_5=*netComps.run_st/10%10;
+                hum_comps.dig2_3=0x0c;
+                hum_comps.dig2_4=MD_DIS_U;
+                hum_comps.dig2_5=5;
                 hum_comps.dot2_pos=0;
                 
             }
-            else
+            else if(!protocolComps.sw._bit.dataPushYet && !protocolComps.sw._bit.dataPushYet1)
             {
                 hum_comps.dig2_0=0x01;
                 hum_comps.dig2_1=0x0a;
                 hum_comps.dig2_2=0x0f;//
-                hum_comps.dig2_3=MD_HIDE_DISP-1;
-                hum_comps.dig2_4=*netComps.run_st%10;
-                hum_comps.dig2_5=*netComps.run_st/10%10;
+                hum_comps.dig2_3=0x01;
+                hum_comps.dig2_4=0x0a;
+                hum_comps.dig2_5=0x0f;
+                hum_comps.dot2_pos=0;
+            }
+            else if(protocolComps.sw._bit.dataPushYet&& !protocolComps.sw._bit.dataPushYet1)
+            {
+               hum_comps.dig2_0=0x0c;
+                hum_comps.dig2_1=MD_DIS_U;
+                hum_comps.dig2_2=5;//s
+                hum_comps.dig2_3=0x01;
+                hum_comps.dig2_4=0x0a;
+                hum_comps.dig2_5=0x0f;
+                hum_comps.dot2_pos=0;
+                
+                
+
+            }
+            else if(!protocolComps.sw._bit.dataPushYet&& protocolComps.sw._bit.dataPushYet1)
+            {
+                hum_comps.dig2_0=0x01;
+                hum_comps.dig2_1=0x0a;
+                hum_comps.dig2_2=0x0f;//s
+                hum_comps.dig2_3=0x0c;
+                hum_comps.dig2_4=MD_DIS_U;
+                hum_comps.dig2_5=5;
                 hum_comps.dot2_pos=0;
             }
            display_line2_data();
+            break;
+
+       case EM_DIS_GPS_STATUS:
+            hum_comps.dig2_0=5;;
+            hum_comps.dig2_1=MD_DIS_p;
+            hum_comps.dig2_2=MD_DIS_G;
+            hum_comps.dig2_3=MD_HIDE_DISP-1;
+            hum_comps.dig2_4=*netComps.run_st%10;
+            hum_comps.dig2_5=*netComps.run_st/10%10;
+            hum_comps.dot2_pos=0;
+            if(!device_comps.gps.isLocSuc) 
+            {
+                hum_comps.dis_oper_mark._bit.cur2=1;
+            }
+            else 
+            {
+                hum_comps.dis_oper_mark._bit.cur2=0;
+            }
+            hum_comps.cursor_2=0;
+            hum_comps.cursor_2_count++;
+            if(hum_comps.cursor_2_count>5)
+            {
+                hum_comps.cursor_2_count=0;
+                if(hum_comps.dis_oper_mark._bit.dis2)
+                {
+                    hum_comps.dis_oper_mark._bit.dis2=0;
+                    
+                }
+                else
+                {
+                   hum_comps.dis_oper_mark._bit.dis2=1;
+                }
+            }
+            
+            display_line2_data();
             break;
         case EM_DIS_SEARCH_NET:
             hum_comps.dis_oper_mark._bit.cur2=0;
@@ -3832,9 +3482,11 @@ hum_comps_t hum_comps=
 	0,//int cursor_0;//0 line cursor position
 	0,//int cursor_1;
 	0,//int cursor_2;
+	0,//int cursor_3;
 	0,//int cursor_0_count;
 	0,//int cursor_1_count;
 	0,//int cursor_2_count;
+	0,//int cursor_3_count;
 	/*******************end lcd seg define **************************/ 
 	
 	EM_SELF_TEST_MODE,//mode_type_t   current_mode;

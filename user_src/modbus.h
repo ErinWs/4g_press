@@ -15,6 +15,7 @@ typedef struct
  
 	unsigned char *const recv_base_pt;//Passed to uart recv  point
 	unsigned char *const recv_pos_pt;
+	
 	unsigned short       op_window_time; 
 
     unsigned char *const recv_cfg_base_pt;

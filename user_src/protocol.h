@@ -26,10 +26,10 @@ typedef struct
                 uint8_t AckTmrOut     :1;
                 uint8_t DataRdy         :1;	
                 uint8_t cmd_shutDown   	:1;	
-                uint8_t res3 	        :1; 
+                uint8_t isAckTmrOut 	        :1; 
                 uint8_t res4     		:1; 
                 uint8_t res5    	    :1;
-                uint8_t res6 		    :1;
+                uint8_t dataPushYet1 		    :1;
                 uint8_t dataPushYet     :1;
                 
         }_bit;
@@ -37,6 +37,7 @@ typedef struct
 	unsigned char * const msg;
 	unsigned int   msgLen;
 	unsigned int   AckTmr;
+	unsigned char  *step;
     int * const event_index_pt;
 	void (*const task_handle)(void);
 	
