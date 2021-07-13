@@ -46,6 +46,9 @@
         <Path>_4g_press_cgr_004\cg_src\r_cg_wdt.h</Path>
         <Path>_4g_press_cgr_004\cg_src\r_cg_wdt_user.c</Path>
         <Path>_4g_press_cgr_004\cg_src\r_option_cc.txt</Path>
+        <Path>_4g_press_cgr_004\cg_src\r_cg_pclbuz.c</Path>
+        <Path>_4g_press_cgr_004\cg_src\r_cg_pclbuz_user.c</Path>
+        <Path>_4g_press_cgr_004\cg_src\r_cg_pclbuz.h</Path>
       </Category>
       <Category Name="usr_src">
         <Path>user_src\24cxx.c</Path>
@@ -68,6 +71,14 @@
         <Path>user_src\protocol.h</Path>
         <Path>user_src\net.c</Path>
         <Path>user_src\net.h</Path>
+        <Path>user_src\pcf857x.c</Path>
+        <Path>user_src\pcf857x.h</Path>
+        <Path>user_src\ad54x0.c</Path>
+        <Path>user_src\ad54x0.h</Path>
+        <Path>user_src\rad.c</Path>
+        <Path>user_src\rad.h</Path>
+        <Path>user_src\press.c</Path>
+        <Path>user_src\press.h</Path>
       </Category>
     </Files>
     <DebugOptions>
@@ -114,6 +125,12 @@
           <Path>DefaultBuild\r_cg_wdt_user.obj</Path>
           <Path>DefaultBuild\protocol.obj</Path>
           <Path>DefaultBuild\net.obj</Path>
+          <Path>DefaultBuild\pcf857x.obj</Path>
+          <Path>DefaultBuild\ad54x0.obj</Path>
+          <Path>DefaultBuild\rad.obj</Path>
+          <Path>DefaultBuild\r_cg_pclbuz.obj</Path>
+          <Path>DefaultBuild\r_cg_pclbuz_user.obj</Path>
+          <Path>DefaultBuild\press.obj</Path>
         </LinkOrder>
         <CommonOptions>
           <IncludePathForC>_4g_press_cgr_004\cg_src</IncludePathForC>

@@ -33,10 +33,10 @@ typedef struct
                }_bit;
     }sw;
 
-    int (*read_param)(void const *,int);
+    int (*read_param)(void *,int);
     int (*save_param)(void const *,int);
 
-    int (*modify_baud)(int);
+    int (*modify_baud)(int,int);
     void (*write)(unsigned char * const , unsigned int );
     void (*const task_handle)(void);
 }modbusComps_t;

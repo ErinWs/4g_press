@@ -86,13 +86,14 @@ static unsigned char Check_Sum(unsigned char *Data,unsigned char Len)
 	return Sum;
 }
 
-unsigned char Check_Sum_5A(unsigned char const *Data,unsigned char Len)
+unsigned char Check_Sum_5A( const void* Data,unsigned char Len)
 {
     unsigned char Sum=0x5A;
     unsigned char i=0;
+	unsigned char *data=(unsigned char *)Data;
     for(i=0;i<Len;i++)
     {
-        Sum+=Data[i];
+        Sum+=data[i];
     }
     return Sum;
 }
@@ -174,7 +175,6 @@ long formatData4fixDot(long temp,int dot)
 static unsigned char Pro_irc(unsigned char Cmd,unsigned char *buf)
 {
 	unsigned char i=9;
-	unsigned char k=0;
 	unsigned long temp=0;
 	unsigned char VerifyResult;
 	
@@ -1126,10 +1126,7 @@ static unsigned char Pro_irc(unsigned char Cmd,unsigned char *buf)
 		return 13+buf[10];
 		
 	}
-	else 
-	{
-		return 1;
-	}
+	
 	return 1;
 	
 }
@@ -1191,6 +1188,30 @@ static unsigned char Check_irc_Com(unsigned char *Rec_Data,unsigned char Rec_Pos
       	
 }
 
+static void irc_start(void)
+{
+    MD_IR_VCM_ON;//o¨¬¨ªa1?¦Ì?//	 
+    ircComps.op_window_time=30;
+    *ircComps.recv_pos_pt = 0;
+  #ifndef MD_MODBUS
+    irc_modify_baud(0,2);
+    enable_irc_receive();
+  #endif
+    device_comps.buzzer.start(11);
+    ircComps.sw._bit.runing=1;
+}
+ static void irc_stop(void)
+ {
+      ircComps.op_window_time=0;
+        *ircComps.recv_pos_pt = 0;
+       #ifndef MD_MODBUS
+        disable_irc_receive();
+        disable_irc_send();
+       #endif
+        MD_IR_VCM_OFF;//o¨¬¨ªa1?¦Ì?//	 
+        ircComps.sw._bit.runing=0;
+ }
+
 static void Deal_irc(void)
 {
 	unsigned char err=0;
@@ -1245,6 +1266,8 @@ ircComps_t ircComps=
    
    30,
     {0},
+    irc_start,  //void (*start)(void);
+    irc_stop,  //void (*stop)(void);
     write_irc,
     ircComps_task_handle
 };

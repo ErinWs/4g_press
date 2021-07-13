@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements device driver for INTP module.
-* Creation Date: 2020/12/30 星期�?
+* Creation Date: 2021/6/18 星期�?
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -116,10 +116,11 @@ static void __near r_intc1_interrupt(void)
 static void __near r_intc2_interrupt(void)
 {
     /* Start user code. Do not edit comment generated here */
-    EI();
+    
+    
+
     cs123x_comps.sw._bit.adc_updated=1;
     cs123x_comps.disale_interrup();
-    cs123x_comps.task_handle();
     /* End user code. Do not edit comment generated here */
 }
 

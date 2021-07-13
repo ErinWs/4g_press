@@ -8,13 +8,16 @@
 #include "hum.h"
 #include "irc.h"
 #include "lora.h"
+#include "rad.h"
 #include "modbus.h"
 #include "cs123x.h"
 #include "system.h"
+#include "press.h"
 
 
 
 pfun const _hlaf_s_task_handle=_0_5s_task_handle;
+pfun const delay_task_50ms=_50ms_task_handle;
 
 typedef struct _TASK_COMPONENTS
 {
@@ -30,7 +33,7 @@ typedef struct _TASK_COMPONENTS
  
 static void  enter_pwd_mode(void)
 {
-    if(!(loraComps.sw._bit.runing)&&(!ircComps.sw._bit.runing)&&(!modbusComps.sw._bit.runing)&&(!netComps.St._bit.running))
+    if(!(loraComps.sw._bit.runing)&&(!ircComps.sw._bit.runing)&&(!modbusComps.sw._bit.runing)&&(!netComps.St._bit.running)&&(!radComps.sw._bit.running)&&(!pressComps.sw._bit.running)&&(!cs123x_comps.sw._bit.adc_updated))
     {
         STOP();
     }
@@ -43,19 +46,22 @@ pfun const pwd_mode_task=enter_pwd_mode;
 static task_comps_t task_comps[]=//50ms
 {
 	
-	{"",&task_comps[0],0,1       ,1 ,     &hum_comps.task_handle            ,'F'},//*50ms  hum_comps.task_handle
-	{"",&task_comps[1],0,1       ,4 ,     &device_comps.task_handle         ,'F'},//delay 100*50ms
-	{"",&task_comps[2],0,5       ,10,     &_hlaf_s_task_handle              ,'F'},
-	{"",&task_comps[3],0,5       ,1 ,     &loraComps.task_50ms              ,'F'},
-	{"",&task_comps[4],0,100     ,0 ,     &ircComps.task_handle             ,'T'},//fast exe
-	{"",&task_comps[5],0,5       ,0 ,     &loraComps.task_handle            ,'T'},//fast exe
-	{"",&task_comps[6],0,2       ,0 ,     &pwd_mode_task                    ,'T'},//fast exe
-	{"",&task_comps[7],0,1       ,0 ,     &modbusComps.task_handle          ,'T'},//fast exe
-	{"",&task_comps[8],0,5       ,0 ,     &protocolComps.task_handle                    ,'T'},//fast exe
-	{"",&task_comps[9],0,5       ,0 ,     &netComps.task_handle          ,'T'},//fast exe
-
-	//{"",&task_comps[8],0,1       ,0 ,     &cs1237_comps.task_handle  ,'T'},//fast exe
-	//{"",&task_comps[9],0,1       ,0 ,     &cs123x_comps.task_handle  ,'T'}//fast exe
+	{"",&task_comps[0] ,0,1       ,1 ,     (pfun *)&hum_comps.task_handle            ,'F'},//*50ms  hum_comps.task_handle
+	{"",&task_comps[1] ,0,1       ,4 ,     (pfun *)&device_comps.task_handle         ,'F'},//delay 100*50ms
+	{"",&task_comps[2] ,0,5       ,10,     (pfun *)&_hlaf_s_task_handle              ,'F'},
+	{"",&task_comps[3] ,0,5       ,1 ,     (pfun *)&loraComps.task_50ms              ,'F'},
+	
+	{"",&task_comps[4] ,0,22      ,0 ,     (pfun *)&ircComps.task_handle             ,'T'},//fast exe
+	{"",&task_comps[5] ,0,5       ,0 ,     (pfun *)&loraComps.task_handle            ,'T'},//fast exe
+	{"",&task_comps[6] ,0,2       ,0 ,     (pfun *)&pwd_mode_task                    ,'T'},//fast exe
+	{"",&task_comps[7] ,0,1       ,0 ,     (pfun *)&modbusComps.task_handle          ,'T'},//fast exe
+	{"",&task_comps[8] ,0,5       ,0 ,     (pfun *)&protocolComps.task_handle        ,'T'},//fast exe
+	{"",&task_comps[9] ,0,5       ,0 ,     (pfun *)&netComps.task_handle             ,'T'},//fast exe
+	{"",&task_comps[9] ,0,5       ,0 ,     (pfun *)&netComps.task_handle             ,'T'},//fast exe
+    {"",&task_comps[10],0,1       ,0 ,     (pfun *)&radComps.task_handle             ,'T'},//fast exe
+	{"",&task_comps[11],0,1       ,0 ,     (pfun *)&pressComps.task_handle           ,'T'},//fast exe
+    {"",&task_comps[12],0,1       ,1 ,     (pfun *)&delay_task_50ms                  ,'F'},
+	{"",&task_comps[13],0,1       ,0 ,     (pfun *)&cs123x_comps.task_handle         ,'T'}//fast exe
 	
 	//...TODO......
 };

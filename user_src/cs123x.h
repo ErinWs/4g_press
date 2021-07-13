@@ -59,6 +59,7 @@ typedef struct _CS123X_COMPONENTS
 	void (*const write_reg )(long *ad,unsigned char dat); 
 	void (*const disale_interrup)(void);
 	void (*const enable_interrupt)(void);
+	void (*const stop)(void);
 	void  ( *const task_handle)(void);//point to device_comps_task_handle
 	
 }cs123x_comps_t;

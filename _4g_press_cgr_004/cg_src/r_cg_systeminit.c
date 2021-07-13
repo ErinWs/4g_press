@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements system initializing function.
-* Creation Date: 2020/12/30 星期三
+* Creation Date: 2021/6/18 星期五
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -35,6 +35,7 @@ Includes
 #include "r_cg_tau.h"
 #include "r_cg_rtc.h"
 #include "r_cg_it.h"
+#include "r_cg_pclbuz.h"
 #include "r_cg_wdt.h"
 #include "r_cg_adc.h"
 #include "r_cg_sau.h"
@@ -65,12 +66,13 @@ Global variables and functions
 void R_Systeminit(void)
 {
     PIOR = 0x00U;
-    //R_CGC_Get_ResetSource();
+    R_CGC_Get_ResetSource();
     R_PORT_Create();
     R_CGC_Create();
     R_TAU0_Create();
     R_RTC_Create();
     R_IT_Create();
+    R_PCLBUZ0_Create();
     R_WDT_Create();
     R_ADC_Create();
     R_SAU0_Create();

@@ -16,6 +16,7 @@ typedef struct
     		uint8_t PLowRealse	    :1;
     		uint8_t timeAuto 		:1;
     		uint8_t intervalTime    :1;
+    		uint8_t batteryBlunt    :1;
     	}_bit;
     }triggerIrq;
     union

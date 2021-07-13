@@ -63,7 +63,7 @@ loraMisc=
     
 };
 
-static int read_yl701_info(void const *buf,int len )
+static int read_yl701_info(void  *buf,int len )
 {
      return _24cxx_comps.read(MD_LORA_PARAM_START_ADDR,buf,len);
 }
@@ -108,7 +108,7 @@ static void write_lora(unsigned char * const buf,unsigned int len)
     {
         enable_lora();
         loraComps.sw._bit.runing=1;
-        R_UART2_Send(loraMisc.send_addr,loraMisc.send_len);
+        R_UART2_Send((unsigned char *)loraMisc.send_addr,loraMisc.send_len);
         loraComps.work_st.dir=EM_SEND;
         
      }
@@ -241,9 +241,7 @@ static unsigned char Check_Sum_whih_NodeId(unsigned int NodeId,unsigned char *Da
 static unsigned char Pro_lora(unsigned char Cmd,unsigned char *buf)
 {
 	unsigned char i=0;
-	unsigned char k=0;
-	unsigned long temp=0;
-	unsigned char VerifyResult;
+//	unsigned char VerifyResult;
 	
 	unsigned int DataId=((unsigned int)buf[2]<<8)+buf[3];
 	
@@ -385,7 +383,7 @@ static unsigned char Pro_lora(unsigned char Cmd,unsigned char *buf)
 //                        loraComps.write(loraMisc.send_buf,i);
 //                        return 3+buf[1];
                     }
-                    else if(loraComps.op_window_time<0)
+                    else if(!loraComps.op_window_time)
                     {
 //                        loraComps.sw._bit.reading_rssi=0;
 //                        loraComps.sw._bit.read_rssi_ok=0;
@@ -398,8 +396,7 @@ static unsigned char Pro_lora(unsigned char Cmd,unsigned char *buf)
                     }
                    return 0;
 					 
-					
-					break;
+			
 			/*	
 			case MD_DATA_ID_READ_ACCESS_ADDR:                //read access addr
 					loraMisc.send_buf[i++]=(buf[9]|0x80);
@@ -589,7 +586,7 @@ static unsigned char Pro_lora(unsigned char Cmd,unsigned char *buf)
                         system_time_cpy.hour=rtc_valve.hour=buf[7];
                         system_time_cpy.min=rtc_valve.min=buf[8];
                         system_time_cpy.sec=rtc_valve.sec=buf[9];
-                       system_time_cpy.cs==Check_Sum_5A(&system_time_cpy, &system_time_cpy.cs-(unsigned char *)&system_time_cpy);
+                       system_time_cpy.cs=Check_Sum_5A(&system_time_cpy, &system_time_cpy.cs-(unsigned char *)&system_time_cpy);
                         R_RTC_Set_CounterValue(rtc_valve);	//ÉèÖÃÊ±¼ä//
                         if(device_comps.save_system_time(&system_time_cpy,sizeof(system_time_cpy)))
         				{
@@ -600,11 +597,7 @@ static unsigned char Pro_lora(unsigned char Cmd,unsigned char *buf)
         					memcpy(&device_comps.system_time,&system_time_cpy,sizeof(system_time_cpy));
         					loraMisc.send_buf[i++]=(Cmd|0x80);
     				    }
-
-
-
-    				
-    			}	
+                }	
     		    loraMisc.send_buf[i++]=0;
                 loraMisc.send_buf[i++]=DataId>>8;//dataID
                 loraMisc.send_buf[i++]=DataId;
@@ -765,10 +758,7 @@ static unsigned char Pro_lora(unsigned char Cmd,unsigned char *buf)
 		return 3+buf[1];
 		
 	}
-	else 
-	{
-		return 1;
-	}
+	
 	return 1;
 	
 }
@@ -805,14 +795,14 @@ static unsigned char pro_lora_config(unsigned char cmd,unsigned char *buf,int le
 	     loraComps.write(loraMisc.send_buf,i);
 	     return len;
         default:
-              return 1;
+              break;
 
      }
      return 1;
  }
 static unsigned char Check_lora_Com(unsigned char *Rec_Data,unsigned char Rec_Pos)
 {
-	unsigned char i=0;
+	
 	if(loraComps.sw._bit.busy)
 	{
 	    return 0;
@@ -886,15 +876,12 @@ static void Deal_lora(void)
 {
 	unsigned char err=0;
  	do
-	{
+	{ 
+		DI();
 	    err=Check_lora_Com(loraMisc.recv_buf,loraMisc.rec_pos); 
-		if(err>0)
-		{
-		    DI();
-			memcpy(loraMisc.recv_buf,loraMisc.recv_buf+err,loraMisc.rec_pos-err);
-			loraMisc.rec_pos-=err;
-			EI();
-    	}
+		memcpy(loraMisc.recv_buf,loraMisc.recv_buf+err,loraMisc.rec_pos-err);
+		loraMisc.rec_pos-=err;
+		EI();
 	}
 	while (err>0);
 }
@@ -1046,7 +1033,7 @@ static void lora_comps_task_50ms(void)
             {
                  enable_lora();
                  loraComps.sw._bit.runing=1;
-                 R_UART2_Send(loraMisc.send_addr,loraMisc.send_len);
+                 R_UART2_Send((unsigned char *)loraMisc.send_addr,loraMisc.send_len);
                  loraComps.sw._bit.sendReq=0;
                  loraComps.work_st.dir=EM_SEND;
             }

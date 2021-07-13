@@ -17,12 +17,14 @@ typedef struct
                 unsigned char res1		            :1;
                }_bit;
     }sw;
+    void (*start)(void);
+    void (*stop)(void);
     void (*write)(unsigned char * const , unsigned int );
     void (*const task_handle)(void);
 }ircComps_t;
 
 extern ircComps_t ircComps;
-extern  unsigned char Check_Sum_5A(unsigned char const *Data,unsigned char Len);
+extern  unsigned char Check_Sum_5A( const void* Data,unsigned char Len);
 extern  long formatData4fixDot(long temp,int dot);
 
 #endif

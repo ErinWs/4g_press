@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements device driver for SAU module.
-* Creation Date: 2020/12/30 星期�?
+* Creation Date: 2021/6/18 星期五
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -31,13 +31,15 @@ Includes
 ***********************************************************************************************************************/
 #include "r_cg_macrodriver.h"
 #include "r_cg_sau.h"
-#include "r_cg_tau.h"
 /* Start user code for include. Do not edit comment generated here */
+#include "r_cg_tau.h"
 #include "irc.h"
 #include "net.h"
 #include "lora.h"
 #include "modbus.h"
 #include "device.h"
+#include "rad.h"
+#include "press.h"
 /* End user code. Do not edit comment generated here */
 #include "r_cg_userdefine.h"
 
@@ -46,8 +48,12 @@ Pragma directive
 ***********************************************************************************************************************/
 #pragma interrupt r_uart0_interrupt_send(vect=INTST0)
 #pragma interrupt r_uart0_interrupt_receive(vect=INTSR0)
+#pragma interrupt r_uart1_interrupt_send(vect=INTST1)
+#pragma interrupt r_uart1_interrupt_receive(vect=INTSR1)
 #pragma interrupt r_uart2_interrupt_send(vect=INTST2)
 #pragma interrupt r_uart2_interrupt_receive(vect=INTSR2)
+#pragma interrupt r_uart3_interrupt_send(vect=INTST3)
+#pragma interrupt r_uart3_interrupt_receive(vect=INTSR3)
 /* Start user code for pragma. Do not edit comment generated here */
 /* End user code. Do not edit comment generated here */
 
@@ -59,14 +65,27 @@ extern volatile uint16_t  g_uart0_tx_count;            /* uart0 send data number
 extern volatile uint8_t * gp_uart0_rx_address;         /* uart0 receive buffer address */
 extern volatile uint16_t  g_uart0_rx_count;            /* uart0 receive data number */
 extern volatile uint16_t  g_uart0_rx_length;           /* uart0 receive data length */
+extern volatile uint8_t * gp_uart1_tx_address;         /* uart1 send buffer address */
+extern volatile uint16_t  g_uart1_tx_count;            /* uart1 send data number */
+extern volatile uint8_t * gp_uart1_rx_address;         /* uart1 receive buffer address */
+extern volatile uint16_t  g_uart1_rx_count;            /* uart1 receive data number */
+extern volatile uint16_t  g_uart1_rx_length;           /* uart1 receive data length */
 extern volatile uint8_t * gp_uart2_tx_address;         /* uart2 send buffer address */
 extern volatile uint16_t  g_uart2_tx_count;            /* uart2 send data number */
 extern volatile uint8_t * gp_uart2_rx_address;         /* uart2 receive buffer address */
 extern volatile uint16_t  g_uart2_rx_count;            /* uart2 receive data number */
 extern volatile uint16_t  g_uart2_rx_length;           /* uart2 receive data length */
+extern volatile uint8_t * gp_uart3_tx_address;         /* uart3 send buffer address */
+extern volatile uint16_t  g_uart3_tx_count;            /* uart3 send data number */
+extern volatile uint8_t * gp_uart3_rx_address;         /* uart3 receive buffer address */
+extern volatile uint16_t  g_uart3_rx_count;            /* uart3 receive data number */
+extern volatile uint16_t  g_uart3_rx_length;           /* uart3 receive data length */
 /* Start user code for global. Do not edit comment generated here */
-volatile unsigned char uart0_rx_data;
-volatile unsigned char uart2_rx_data;
+unsigned char uart0_rx_data;
+unsigned char uart1_rx_data;
+unsigned char uart2_rx_data;
+unsigned char uart3_rx_data;
+
 
 /* End user code. Do not edit comment generated here */
 
@@ -91,10 +110,7 @@ static void __near r_uart0_interrupt_receive(void)
     
     rx_data = RXD0;
 
-   
-	
-	  
-	if (g_uart0_rx_length > g_uart0_rx_count)
+    if (g_uart0_rx_length > g_uart0_rx_count)
     {
         *gp_uart0_rx_address = rx_data;
         gp_uart0_rx_address++;
@@ -151,6 +167,11 @@ static void r_uart0_callback_receiveend(void)
 	   modbusComps.recv_cfg_base_pt[*modbusComps.recv_cfg_pos_pt]=uart0_rx_data;
 	  *modbusComps.recv_cfg_pos_pt+=1;
 	  *modbusComps.recv_cfg_pos_pt&=0x3f;
+
+	   pressComps.recv_base_pt[*pressComps.recv_pos_pt]=uart0_rx_data;
+	  *pressComps.recv_pos_pt+=1;
+	  *pressComps.recv_pos_pt&=0x3f;
+	  
        R_UART0_Receive(&uart0_rx_data,1);
     /* End user code. Do not edit comment generated here */
 }
@@ -182,7 +203,7 @@ static void r_uart0_callback_sendend(void)
     #else
     if(modbusComps.sw._bit.baud_modified)
     {
-       modbus_modify_baud(modbusComps.param_pt->baud);
+       modbus_modify_baud(modbusComps.param_pt->baud,0);
        modbusComps.sw._bit.baud_modified=0;
     }
     disable_modbus_send();
@@ -208,6 +229,113 @@ static void r_uart0_callback_error(uint8_t err_type)
     /* End user code. Do not edit comment generated here */
 }
 /***********************************************************************************************************************
+* Function Name: r_uart1_interrupt_receive
+* Description  : None
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void __near r_uart1_interrupt_receive(void)
+{
+    uint8_t rx_data;
+    uint8_t err_type;
+    
+    err_type = (uint8_t)(SSR03 & 0x0007U);
+    SIR03 = (uint16_t)err_type;
+
+    if (err_type != 0U)
+    {
+        r_uart1_callback_error(err_type);
+    }
+    
+    rx_data = RXD1;
+
+    if (g_uart1_rx_length > g_uart1_rx_count)
+    {
+        *gp_uart1_rx_address = rx_data;
+        gp_uart1_rx_address++;
+        g_uart1_rx_count++;
+
+        if (g_uart1_rx_length == g_uart1_rx_count)
+        {
+            r_uart1_callback_receiveend();
+        }
+    }
+    else
+    {
+        r_uart1_callback_softwareoverrun(rx_data);
+    }
+}
+/***********************************************************************************************************************
+* Function Name: r_uart1_interrupt_send
+* Description  : None
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void __near r_uart1_interrupt_send(void)
+{
+    if (g_uart1_tx_count > 0U)
+    {
+        TXD1 = *gp_uart1_tx_address;
+        gp_uart1_tx_address++;
+        g_uart1_tx_count--;
+    }
+    else
+    {
+        r_uart1_callback_sendend();
+    }
+}
+/***********************************************************************************************************************
+* Function Name: r_uart1_callback_receiveend
+* Description  : This function is a callback function when UART1 finishes reception.
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart1_callback_receiveend(void)
+{
+    /* Start user code. Do not edit comment generated here */
+     radComps.recv_base_pt[*radComps.recv_pos_pt]=uart1_rx_data;
+	*radComps.recv_pos_pt+=1;
+	*radComps.recv_pos_pt&=0x3f;
+	
+	 R_UART1_Receive(&uart1_rx_data,1);
+    /* End user code. Do not edit comment generated here */
+}
+/***********************************************************************************************************************
+* Function Name: r_uart1_callback_softwareoverrun
+* Description  : This function is a callback function when UART1 receives an overflow data.
+* Arguments    : rx_data -
+*                    receive data
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart1_callback_softwareoverrun(uint16_t rx_data)
+{
+    /* Start user code. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
+}
+/***********************************************************************************************************************
+* Function Name: r_uart1_callback_sendend
+* Description  : This function is a callback function when UART1 finishes transmission.
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart1_callback_sendend(void)
+{
+    /* Start user code. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
+}
+/***********************************************************************************************************************
+* Function Name: r_uart1_callback_error
+* Description  : This function is a callback function when UART1 reception error occurs.
+* Arguments    : err_type -
+*                    error type value
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart1_callback_error(uint8_t err_type)
+{
+    /* Start user code. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
+}
+/***********************************************************************************************************************
 * Function Name: r_uart2_interrupt_receive
 * Description  : None
 * Arguments    : None
@@ -227,7 +355,6 @@ static void __near r_uart2_interrupt_receive(void)
     }
     
     rx_data = RXD2;
-
 
     if (g_uart2_rx_length > g_uart2_rx_count)
     {
@@ -331,8 +458,136 @@ static void r_uart2_callback_error(uint8_t err_type)
     /* Start user code. Do not edit comment generated here */
     /* End user code. Do not edit comment generated here */
 }
+/***********************************************************************************************************************
+* Function Name: r_uart3_interrupt_receive
+* Description  : None
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void __near r_uart3_interrupt_receive(void)
+{
+    uint8_t rx_data;
+    uint8_t err_type;
+    
+    err_type = (uint8_t)(SSR13 & 0x0007U);
+    SIR13 = (uint16_t)err_type;
+
+    if (err_type != 0U)
+    {
+        r_uart3_callback_error(err_type);
+    }
+    
+    rx_data = RXD3;
+
+    if (g_uart3_rx_length > g_uart3_rx_count)
+    {
+        *gp_uart3_rx_address = rx_data;
+        gp_uart3_rx_address++;
+        g_uart3_rx_count++;
+
+        if (g_uart3_rx_length == g_uart3_rx_count)
+        {
+            r_uart3_callback_receiveend();
+        }
+    }
+    else
+    {
+        r_uart3_callback_softwareoverrun(rx_data);
+    }
+}
+/***********************************************************************************************************************
+* Function Name: r_uart3_interrupt_send
+* Description  : None
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void __near r_uart3_interrupt_send(void)
+{
+    if (g_uart3_tx_count > 0U)
+    {
+        TXD3 = *gp_uart3_tx_address;
+        gp_uart3_tx_address++;
+        g_uart3_tx_count--;
+    }
+    else
+    {
+        r_uart3_callback_sendend();
+    }
+}
+/***********************************************************************************************************************
+* Function Name: r_uart3_callback_receiveend
+* Description  : This function is a callback function when UART3 finishes reception.
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart3_callback_receiveend(void)
+{
+    /* Start user code. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
+}
+/***********************************************************************************************************************
+* Function Name: r_uart3_callback_softwareoverrun
+* Description  : This function is a callback function when UART3 receives an overflow data.
+* Arguments    : rx_data -
+*                    receive data
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart3_callback_softwareoverrun(uint16_t rx_data)
+{
+    /* Start user code. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
+}
+/***********************************************************************************************************************
+* Function Name: r_uart3_callback_sendend
+* Description  : This function is a callback function when UART3 finishes transmission.
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart3_callback_sendend(void)
+{
+    /* Start user code. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
+}
+/***********************************************************************************************************************
+* Function Name: r_uart3_callback_error
+* Description  : This function is a callback function when UART3 reception error occurs.
+* Arguments    : err_type -
+*                    error type value
+* Return Value : None
+***********************************************************************************************************************/
+static void r_uart3_callback_error(uint8_t err_type)
+{
+    /* Start user code. Do not edit comment generated here */
+    /* End user code. Do not edit comment generated here */
+}
 
 /* Start user code for adding. Do not edit comment generated here */
+
+void disable_uart1(void)
+{
+    R_UART1_Stop();
+}
+void enable_uart1(void)
+{
+    R_UART1_Receive(&uart1_rx_data,1);
+    R_UART1_Start();
+}
+
+void disable_rad(void)
+{
+  // R_TAU0_Channel1_Stop();
+   disable_uart1();
+}
+
+void enable_rad(void)
+{
+    //R_TAU0_Channel1_Start();
+    enable_uart1();
+}
+
+
+
+
 void enable_uart2(void)
 {
     R_UART2_Receive(&uart2_rx_data,1);
@@ -456,16 +711,16 @@ void enable_modbus_receive(void)
     enable_uart0_receive();
 }
 
-int modbus_modify_baud(int baud)
+static void modify_uart0_baud(int baud,int parity)
 {
-    if(baud==0||baud>4)
-    {
-        return 0;
-    }
-    disable_modbus_receive();
-    disable_modbus_send();
-   // NOP();
-    if(baud==1)//2400
+   unsigned int pari=parity%4;
+   R_UART0_Stop();
+   pari<<=8;
+   if(baud ==0)//1200
+   {
+         SPS0 = _0005_SAU_CK00_FCLK_5 | _0050_SAU_CK01_FCLK_5;
+   }
+   if(baud ==1)//2400
    {
          SPS0 = _0004_SAU_CK00_FCLK_4 | _0040_SAU_CK01_FCLK_4;
    }
@@ -481,12 +736,55 @@ int modbus_modify_baud(int baud)
    {
          SPS0 = _0001_SAU_CK00_FCLK_1 | _0010_SAU_CK01_FCLK_1;
    }
-    SCR00 = _8000_SAU_TRANSMISSION | _0000_SAU_INTSRE_MASK | _0000_SAU_PARITY_NONE | _0080_SAU_LSB | 
+    SCR00 = _8000_SAU_TRANSMISSION | _0000_SAU_INTSRE_MASK | pari | _0080_SAU_LSB | 
             _0010_SAU_STOP_1 | _0007_SAU_LENGTH_8;
-    SCR01 = _4000_SAU_RECEPTION | _0000_SAU_INTSRE_MASK | _0000_SAU_PARITY_NONE | _0080_SAU_LSB | _0010_SAU_STOP_1 | 
+    SCR01 = _4000_SAU_RECEPTION | _0000_SAU_INTSRE_MASK | pari | _0080_SAU_LSB | _0010_SAU_STOP_1 | 
             _0007_SAU_LENGTH_8;
 }
 
+int irc_modify_baud(int baud,int parity)
+{
+	 modify_uart0_baud(baud,parity);
+	return 0;
+	
+}
+int press_modify_baud(int baud,int parity)
+{
+    if(baud==0||baud>4)
+    {
+        return 1;
+    }
+   
+   // NOP();
+   
+    modify_uart0_baud(baud,parity);
+	return 0;
+}
+int modbus_modify_baud(int baud,int parity)
+{
+    if(baud==0||baud>4)
+    {
+        return 1;
+    }
+   
+   // NOP();
+   
+    modify_uart0_baud(baud,parity);
+	return 0;
+}
+
+
+
+void enable_press(void)
+{
+    R_UART0_Receive(&uart0_rx_data,1);
+	R_UART0_Start();
+    
+}
+void disable_press(void)
+{
+     R_UART0_Stop();
+}
 
 /*
  uint8_t rx_data;

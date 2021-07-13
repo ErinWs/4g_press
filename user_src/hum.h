@@ -140,7 +140,7 @@ typedef enum
 	
 }mode_type_t;
 
-typedef struct //Handling of keys in different modes
+typedef struct _MODE_COMPONENTS//Handling of keys in different modes
 {
 	char *desc;
 	struct _MODE_COMPONENTS *this;

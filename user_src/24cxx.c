@@ -245,7 +245,7 @@ static unsigned char read_eeprom(unsigned int addr, void *buf, unsigned int n)
 	MD_I2C_RETURN_TRUE;
 }
 
-static unsigned char init_eeprom()
+static unsigned char init_eeprom(void)
 {
     unsigned char status=MD_I2C_STATUS_FALSE;
     MD_I2C_VCC=0;           
@@ -253,14 +253,13 @@ static unsigned char init_eeprom()
     MD_I2C_SCL=0;            
     MD_I2C_SDA=0;            
     MD_I2C_SDA_MODE=0;
-    MD_I2C_RETURN_TRUE;
     status=MD_I2C_STATUS_TRUE;
     return status;
 
 }
 _24cxx_comps_t _24cxx_comps=
 {
-	"e2pom r/w driver", //char *desc;
+	"", //char *desc;
 	&_24cxx_comps,      //struct _24CXX_COMPONENTS *this;
 	init_eeprom,        // unsigned char init_eeprom(void);
 	write_eeprom,       //unsigned char write_eeprom(unsigned int addr,  void const *buf, unsigned int n);

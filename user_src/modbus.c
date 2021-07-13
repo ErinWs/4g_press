@@ -11,6 +11,7 @@
 #include "24cxx.h"
 #include "device.h"
 #include "hum.h"
+#include "rad.h"
 #include "irc.h"
 #include "lora.h"
 #include "modbus.h"
@@ -57,10 +58,19 @@ static void * const modbus_data_map[]=
     &device_comps.coe.temp,
 };
 
+static void * const modbus_rad_data_map[]=
+{
+    &radComps.average_high_cm,
+    &radComps.average_high_mm,
+    &radComps.position_height_cm,
+    &radComps.position_height_mm,
+    &device_comps.level_param.total_high_mm,
+    &device_comps.level_param.coe
+};
 
 
 
-static int read_modbus_param(void const *buf,int len )
+static int read_modbus_param(void  *buf,int len )
 {
      return _24cxx_comps.read(MD_MODBUS_PARAM_START_ADDR,buf,len);
 }
@@ -74,10 +84,7 @@ static int save_modbus_param(void const *buf,int len )
 static unsigned int generateCRC(unsigned char *buffer, unsigned int messageLength)
 {
 	unsigned int crc = 0xFFFF;
-	unsigned int crcHigh = 0;
-	unsigned int crcLow = 0;
 	int i, j = 0;
-
 	for (i = 0;i < messageLength;i++)
 	{
 		crc ^= buffer[i];
@@ -105,8 +112,7 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
 {
 	int i=0;
 	unsigned int crc;
-	unsigned char k=0;
-   	int tmp;
+	long tmp;
 	
 	unsigned int addr=((unsigned int)buf[2]<<8)+buf[3];
 	if(Cmd==0x03)//Read
@@ -123,49 +129,83 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
             crc=generateCRC(modbusMisc.send_buf, i);
             modbusMisc.send_buf[i++]=crc;
             modbusMisc.send_buf[i++]=crc>>8;
-	    modbusComps.write(modbusMisc.send_buf,i);
-            return 8;
+	        modbusComps.write(modbusMisc.send_buf,i);
+            return len;
 		}
-		else if((addr<10)&&(num+addr<11))
-		{
-    		
-                modbusMisc.send_buf[i++]=modbusMisc.param.addr;
-                modbusMisc.send_buf[i++]=Cmd;
-                modbusMisc.send_buf[i++]=num*2;//length
-                for(k=0;k<num;k++)
-                {
-                    if(addr==0||addr==1||addr==3||addr==7)//addr, baud,measure_unit batt
-                    {   
-                        modbusMisc.send_buf[i++] =0;
-                        modbusMisc.send_buf[i++] =*((unsigned char *)modbus_data_map[addr++]);
-                    }
-                    else if(addr==2)//dot
+		 #ifdef MD_EXT_MEASUREMENT_MODULE
+    		else if((addr<6)&&(addr*2+num<13))
+    		{
+        		    int quot=num/2;
+        		    int rem=num%2;
+                    modbusMisc.send_buf[i++]=modbusMisc.param.addr;
+                    modbusMisc.send_buf[i++]=Cmd;
+                    modbusMisc.send_buf[i++]=num*2;//length
+                    
+                    for(k=0;k<quot;k++)
                     {
                         modbusMisc.send_buf[i++] =0;
-                        modbusMisc.send_buf[i++] =(*((unsigned char *)modbus_data_map[addr++]))-2;
+                        modbusMisc.send_buf[i++] =*((long *)modbus_rad_data_map[addr])>>24;
+                        modbusMisc.send_buf[i++] =*((long *)modbus_rad_data_map[addr])>>16;
+                        modbusMisc.send_buf[i++] =*((long *)modbus_rad_data_map[addr])>>8;
+                        modbusMisc.send_buf[i++] =*((long *)modbus_rad_data_map[addr])>>0;
+                        addr++;
                     }
-                    else if(addr==4||addr==5)//press full
+                    if(rem)
                     {
-                        modbusMisc.send_buf[i++] =*((long *)modbus_data_map[addr])/100>>8;
-                        modbusMisc.send_buf[i++] =*((long *)modbus_data_map[addr++])/100;
+                    
+                        modbusMisc.send_buf[i++] =*((long *)modbus_rad_data_map[addr])>>8;
+                        modbusMisc.send_buf[i++] =*((long *)modbus_rad_data_map[addr])>>0;
+                        addr++;
                     }
-                    else if(addr==6||addr==8||addr==9)//6 8 9 temp press_coi temp_coi
+                    crc=generateCRC(modbusMisc.send_buf, i);
+                    modbusMisc.send_buf[i++]=crc;
+                    modbusMisc.send_buf[i++]=crc>>8;
+                    modbusComps.write(modbusMisc.send_buf,i);
+        		    return len;
+                 
+             }
+          #else
+             else if((addr<10)&&(num+addr<11))
+    		{
+        		
+                    modbusMisc.send_buf[i++]=modbusMisc.param.addr;
+                    modbusMisc.send_buf[i++]=Cmd;
+                    modbusMisc.send_buf[i++]=num*2;//length
+                    for(k=0;k<num;k++)
                     {
-                        modbusMisc.send_buf[i++] =*((int*)modbus_data_map[addr])>>8;
-                        modbusMisc.send_buf[i++] =*((int*)modbus_data_map[addr++]);
+                        if(addr==0||addr==1||addr==3||addr==7)//addr, baud,measure_unit batt
+                        {   
+                            modbusMisc.send_buf[i++] =0;
+                            modbusMisc.send_buf[i++] =*((unsigned char *)modbus_data_map[addr++]);
+                        }
+                        else if(addr==2)//dot
+                        {
+                            modbusMisc.send_buf[i++] =0;
+                            modbusMisc.send_buf[i++] =(*((unsigned char *)modbus_data_map[addr++]))-2;
+                        }
+                        else if(addr==4||addr==5)//press full
+                        {
+                            modbusMisc.send_buf[i++] =*((long *)modbus_data_map[addr])/100>>8;
+                            modbusMisc.send_buf[i++] =*((long *)modbus_data_map[addr++])/100;
+                        }
+                        else if(addr==6||addr==8||addr==9)//6 8 9 temp press_coi temp_coi
+                        {
+                            modbusMisc.send_buf[i++] =*((int*)modbus_data_map[addr])>>8;
+                            modbusMisc.send_buf[i++] =*((int*)modbus_data_map[addr++]);
+                        }
+                        else
+                        {
+                            return 1;
+                        }   
                     }
-                    else
-                    {
-                        return 1;
-                    }   
-                }
-                crc=generateCRC(modbusMisc.send_buf, i);
-                modbusMisc.send_buf[i++]=crc;
-                modbusMisc.send_buf[i++]=crc>>8;
-                modbusComps.write(modbusMisc.send_buf,i);
-    		    return 8;
-             
-         }
+                    crc=generateCRC(modbusMisc.send_buf, i);
+                    modbusMisc.send_buf[i++]=crc;
+                    modbusMisc.send_buf[i++]=crc>>8;
+                    modbusComps.write(modbusMisc.send_buf,i);
+        		    return len;
+                 
+             }
+          #endif    
          else if((addr>0x2f)&&(addr<0x32)&&(num+addr<0x33))
          {
             modbusMisc.send_buf[i++]=modbusMisc.param.addr;
@@ -195,7 +235,7 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
             modbusMisc.send_buf[i++]=crc;
             modbusMisc.send_buf[i++]=crc>>8;
             modbusComps.write(modbusMisc.send_buf,i);
-            return 8;
+            return len;
 
          
          }
@@ -206,19 +246,19 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
     }
 	else if(Cmd==6)//Write
 	{
-                if(addr==0)
-                {
-                    modbusMisc.send_buf[i++]=buf[5];
-                } 
-                else
-                {
-                    modbusMisc.send_buf[i++]=modbusMisc.param.addr;
-                }
-				modbusMisc.send_buf[i++]=Cmd;
-				modbusMisc.send_buf[i++]=buf[2];
-				modbusMisc.send_buf[i++]=buf[3];
-				modbusMisc.send_buf[i++]=buf[4];
-				modbusMisc.send_buf[i++]=buf[5];;
+        if(addr==0)
+        {
+            modbusMisc.send_buf[i++]=buf[5];
+        } 
+        else
+        {
+            modbusMisc.send_buf[i++]=modbusMisc.param.addr;
+        }
+		modbusMisc.send_buf[i++]=Cmd;
+		modbusMisc.send_buf[i++]=buf[2];
+		modbusMisc.send_buf[i++]=buf[3];
+		modbusMisc.send_buf[i++]=buf[4];
+		modbusMisc.send_buf[i++]=buf[5];;
 	    switch(addr)
 	    {
           case 0:                //addr
@@ -237,7 +277,16 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
         			modbusComps.save_param(&modbusMisc.param,sizeof(modbusMisc.param));
         			modbusComps.sw._bit.baud_modified=1;
         		}
-				break;		
+				break;
+		   case 5:                //level_param.coe
+    	        tmp=((unsigned int)buf[4]<<8)+buf[5];
+    	        if(tmp>=7000&&tmp<=13000)
+    	        {
+                	device_comps.level_param.coe=tmp;
+                	device_comps.level_param.cs=Check_Sum_5A(&device_comps.level_param, & device_comps.level_param.cs-(unsigned char *)&device_comps.level_param);
+	                device_comps.save_level_param(&device_comps.level_param,sizeof(device_comps.level_param));
+        		}
+                break;
 		   case 8:                //press_coe
 		        tmp=((unsigned int)buf[4]<<8)+buf[5];
 		        if(tmp>=7000&&tmp<=13000)
@@ -247,7 +296,7 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
         			device_comps.save_coe(&device_comps.coe,sizeof(device_comps.coe));
         		}
                 break;
-				
+		  	
 		   case 9:                //temp_coe
 		        tmp=((unsigned int)buf[4]<<8)+buf[5];
 		        if(tmp>=7000&&tmp<=13000)
@@ -265,7 +314,13 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
                      device_comps.coe.cs=Check_Sum_5A(&device_comps.coe, &device_comps.coe.cs-(unsigned char *)&device_comps.coe);
         			 device_comps.save_coe(&device_comps.coe,sizeof(device_comps.coe));
     			}
-                 break;     
+                break; 
+
+            case 0x2001:                //addr
+				modbusMisc.param.addr=buf[5];
+                modbusMisc.param.cs=Check_Sum_5A(&modbusMisc.param, &modbusMisc.param.cs-(unsigned char *)&modbusMisc.param);
+    			modbusComps.save_param(&modbusMisc.param,sizeof(modbusMisc.param));
+    			break;    
 		   default:       
 					return 1;	
 		}
@@ -273,14 +328,31 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
 		modbusMisc.send_buf[i++]=crc;
 		modbusMisc.send_buf[i++]=crc>>8;
 		modbusComps.write(modbusMisc.send_buf,i);
-		return 8;
+		return len;
 		
 	}
-	else if(Cmd==0x10)//write ser_num
+	else if(Cmd==0x10)//many bytes wirte
 	{
-        memcpy(device_comps.device_sensor.ser_num,&buf[7],8);
-    	device_comps.device_sensor.cs=Check_Sum_5A(&device_comps.device_sensor.ser_num, &device_comps.device_sensor.cs-(unsigned char *)&device_comps.device_sensor.ser_num);
-    	device_comps.save_device_sensor(&device_comps.device_sensor.ser_num,sizeof(device_comps.device_sensor));
+        switch(addr)
+        {
+            case 0x40://write ser_num
+                memcpy(device_comps.device_sensor.ser_num,&buf[7],8);
+            	device_comps.device_sensor.cs=Check_Sum_5A(&device_comps.device_sensor.ser_num, &device_comps.device_sensor.cs-(unsigned char *)&device_comps.device_sensor.ser_num);
+            	device_comps.save_device_sensor(&device_comps.device_sensor.ser_num,sizeof(device_comps.device_sensor));
+            	break;
+        	case 0x04://rad level_param:total height
+                tmp=((long)buf[7]<<24)+((long)buf[8]<<16)+((long)buf[9]<<8)+buf[10];
+    	        if(tmp>=0)
+    	        {
+                	device_comps.level_param.total_high_mm=tmp;
+                	device_comps.level_param.cs=Check_Sum_5A(&device_comps.level_param, & device_comps.level_param.cs-(unsigned char *)&device_comps.level_param);
+	                device_comps.save_level_param(&device_comps.level_param,sizeof(device_comps.level_param));
+        		}
+                break;
+        	
+        	default:
+        	        return 1;
+        }	        
         modbusMisc.send_buf[i++]=modbusMisc.param.addr;
         modbusMisc.send_buf[i++]=Cmd;
         modbusMisc.send_buf[i++]=buf[2];
@@ -292,10 +364,6 @@ static unsigned char Pro_modbus(unsigned char Cmd,unsigned char *buf,int len)
 		modbusMisc.send_buf[i++]=crc>>8;
 		modbusComps.write(modbusMisc.send_buf,i);
 		return len;
-	}
-	else 
-	{
-		return 1;
 	}
 	return 1;
 	
@@ -326,15 +394,15 @@ static unsigned char Check_modbus_Com(unsigned char *Rec_Data,unsigned char Rec_
 	}
 	if(Rec_Data[1]==0x10)
 	{
-        if(Rec_Data[6]!=8)
+        if(Rec_Data[6]!=8&&Rec_Data[6]!=4)
         {
             return 1;
         }
-        if(Rec_Pos<8+9) 
+        if(Rec_Pos<Rec_Data[6]+9) 
         {
             return 0;
         }
-        len=17;
+        len=Rec_Data[6]+9;
 	}
 	else 
 	{
@@ -350,7 +418,7 @@ static unsigned char Check_modbus_Com(unsigned char *Rec_Data,unsigned char Rec_
 
 static unsigned char pro_modbus_config(unsigned char cmd,unsigned char *buf,int len)
 {
-    int i=0;
+    
     yl701_info_t yl701_info_cpy;
     switch(cmd)
     {
@@ -386,7 +454,7 @@ static unsigned char pro_modbus_config(unsigned char cmd,unsigned char *buf,int 
             return len;
 
         default:
-              return 1;
+              break;
 
      }
      return 1;

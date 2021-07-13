@@ -8,9 +8,12 @@
 #include "net.h"
 #include "irc.h"
 #include "hum.h"
+#include "press.h"
 #include "24cxx.h"
 #include "stdio.h"
 #include "stdlib.h"
+#include "rad.h"
+#include "cs123x.h"
 
 
 //#define static   
@@ -45,56 +48,56 @@ protocolMisc=
 };
 
 
-//////return  lenght of Rcvbuf
-static unsigned short crc_16(unsigned char const*puchMsg, unsigned char *Rcvbuf ,unsigned int usDataLen)
-{
-	unsigned short wCRCin = 0x0000;
-	unsigned short wCPoly = 0x1021;
-	unsigned short wChar = 0;
-	int i=0;
-
-	while (usDataLen--) 	
-	{
-	wChar = *(puchMsg++);
-	wCRCin ^= (wChar << 8);
-	for(i = 0;i < 8;i++)
-	{
-	  if(wCRCin & 0x8000)
-	    wCRCin = (wCRCin << 1) ^ wCPoly;
-	  else
-	    wCRCin = wCRCin << 1;
-	}
-	}
-	Rcvbuf[0] = (wCRCin & 0xff00)>>8;//??????
-	Rcvbuf[1] = (wCRCin& 0x00ff);  //ж╠ик????
-	return 2;
-}
-
-//return Return crc check result 0 ok 1,err
-//static unsigned short check_crc_16(unsigned char const *Array, unsigned int crc_16,unsigned int Len)
+////////return  lenght of Rcvbuf
+//static unsigned short crc_16(unsigned char const*puchMsg, unsigned char *Rcvbuf ,unsigned int usDataLen)
 //{
+////	unsigned short wCRCin = 0x0000;
+////	unsigned short wCPoly = 0x1021;
+////	unsigned short wChar = 0;
+////	int i=0;
+
+////	while (usDataLen--) 	
+////	{
+////	wChar = *(puchMsg++);
+////	wCRCin ^= (wChar << 8);
+////	for(i = 0;i < 8;i++)
+////	{
+////	  if(wCRCin & 0x8000)
+////	    wCRCin = (wCRCin << 1) ^ wCPoly;
+////	  else
+////	    wCRCin = wCRCin << 1;
+////	}
+////	}
+////	Rcvbuf[0] = (wCRCin & 0xff00)>>8;//??????
+////	Rcvbuf[1] = (wCRCin& 0x00ff);  //ж╠ик????
+////	return 2;
+//}
+
+////return Return crc check result 0 ok 1,err
+////static unsigned short check_crc_16(unsigned char const *Array, unsigned int crc_16,unsigned int Len)
+////{
        
-static unsigned short check_crc_16(unsigned char const*puchMsg, unsigned int crc_16,unsigned int usDataLen)
-{
-  unsigned short wCRCin = 0x0000;
-  unsigned short wCPoly = 0x1021;
-  unsigned short wChar = 0;
-  int i=0;
+//static unsigned short check_crc_16(unsigned char const*puchMsg, unsigned int crc_16,unsigned int usDataLen)
+//{
+////  unsigned short wCRCin = 0x0000;
+////  unsigned short wCPoly = 0x1021;
+////  unsigned short wChar = 0;
+////  int i=0;
   
-  while (usDataLen--) 	
-  {
-        wChar = *(puchMsg++);
-        wCRCin ^= (wChar << 8);
-        for(i = 0;i < 8;i++)
-        {
-          if(wCRCin & 0x8000)
-            wCRCin = (wCRCin << 1) ^ wCPoly;
-          else
-            wCRCin = wCRCin << 1;
-        }
-  }
-  return (wCRCin!=crc_16) ;
-}
+////  while (usDataLen--) 	
+////  {
+////        wChar = *(puchMsg++);
+////        wCRCin ^= (wChar << 8);
+////        for(i = 0;i < 8;i++)
+////        {
+////          if(wCRCin & 0x8000)
+////            wCRCin = (wCRCin << 1) ^ wCPoly;
+////          else
+////            wCRCin = wCRCin << 1;
+////        }
+////  }
+////  return (wCRCin!=crc_16) ;
+//}
 
 
 static long pwr(int n)
@@ -154,22 +157,23 @@ static unsigned int AddTimeDataSeg(unsigned char *buf)
 	unsigned int Count=0;
 	unsigned int m=0;
 	long temp;
+	long buffer[48];
 	Addr=device_comps.TimeSegData.store_addr;
 	if((Addr-MD_TIME_SEG_DATA_START_ADDR)/4>=48)
 	{
-		_24cxx_comps.read(Addr-(unsigned int)48*4,buf,(unsigned int)48*4);
+		_24cxx_comps.read(Addr-(unsigned int)48*4,buffer,(unsigned int)48*4);
 	}
 	else
 	{
 		StartAddr=MD_TIME_SEG_DATA_END_ADDR-((48-(Addr-MD_TIME_SEG_DATA_START_ADDR)/4)*4);
 		Count=(48-(Addr-MD_TIME_SEG_DATA_START_ADDR)/4)*4;
-		_24cxx_comps.read(StartAddr,buf,Count);
-		_24cxx_comps.read(MD_TIME_SEG_DATA_START_ADDR,buf+Count,(Addr-MD_TIME_SEG_DATA_START_ADDR)/4*4);
+		_24cxx_comps.read(StartAddr,buffer,Count);
+		_24cxx_comps.read(MD_TIME_SEG_DATA_START_ADDR,(unsigned char *)buffer+Count,(Addr-MD_TIME_SEG_DATA_START_ADDR)/4*4);
 		
 	}
 	for(m=0;m<48;m++)
 	{
-        temp=formatData4fixDot(  *((long *)&buf[m*4]),device_comps.calibration_param.dot );
+        temp=formatData4fixDot(buffer[m],device_comps.calibration_param.dot );
         buf[m*4+0]=temp>>24;
         buf[m*4+1]=temp>>16;
         buf[m*4+2]=temp>>8;
@@ -191,29 +195,167 @@ static unsigned char VerifyMeterId(unsigned char const *buf, unsigned char const
     return memcmp(buf,temp,14);
 }
 
-static int AddTriggerReportCode(unsigned char *const buf,int event)
+//static int AddTriggerReportCode(unsigned char *const buf,int event)
+//{
+//	int i=0;
+////	static unsigned char const event_table[][4]=//Triggering event report table E.2
+////	{
+////		{0x80,0x01,0x00,0x06},//low voltage
+////		{0x80,0x01,0x00,0x07},
+////		{0x80,0x01,0x00,0x09},
+////		{0x80,0x01,0x00,0x10},
+////		{0x80,0x01,0x00,0x11},
+////		{0x80,0x01,0x00,0x12},
+////		{0x80,0x01,0x00,0x13},
+////		{0x00,0x00,0x00,0x00},
+////		{0x00,0x00,0x00,0x01}
+////	};
+////	buf[i++]=event_table[event][0];//Trigger report event code 1
+////	buf[i++]=event_table[event][1];//Trigger report event code 2
+////	buf[i++]=event_table[event][2];//Trigger report event code 3
+////	buf[i++]=event_table[event][3];//Trigger report event code 4
+//	return i;
+//}
+
+static int encapsulate_zhian_pack(char *const buf,int event)
 {
-	int i=0;
-	static unsigned char const event_table[][4]=//Triggering event report table E.2
-	{
-		{0x80,0x01,0x00,0x06},//low voltage
-		{0x80,0x01,0x00,0x07},
-		{0x80,0x01,0x00,0x09},
-		{0x80,0x01,0x00,0x10},
-		{0x80,0x01,0x00,0x11},
-		{0x80,0x01,0x00,0x12},
-		{0x80,0x01,0x00,0x13},
-		{0x00,0x00,0x00,0x00},
-		{0x00,0x00,0x00,0x01}
-	};
-	buf[i++]=event_table[event][0];//Trigger report event code 1
-	buf[i++]=event_table[event][1];//Trigger report event code 2
-	buf[i++]=event_table[event][2];//Trigger report event code 3
-	buf[i++]=event_table[event][3];//Trigger report event code 4
-	return i;
+    int i=0;
+    long temp=0;
+    char msg[32]="";
+
+
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.manufacturer_info.name,sizeof(device_comps.manufacturer_info.name));
+    sprintf(&buf[i],"$%s$;",msg);
+    i+=strlen(&buf[i]);
+    
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.type));
+    sprintf(&buf[i],"DTYPE:%s;",msg);
+    i+=strlen(&buf[i]);
+    
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.device_info.id,sizeof(device_comps.device_info.id));
+    sprintf(&buf[i],"DSN:%s;",msg);
+    i+=strlen(&buf[i]);
+    
+    sprintf(&buf[i],"START;");
+    i+=strlen(&buf[i]);
+
+    if(device_comps.gps.glng<0)
+    {
+        sprintf(&buf[i],"GLNG:%07ld;",device_comps.gps.glng);
+    }
+    else
+    {
+        sprintf(&buf[i],"GLNG:%06ld;",device_comps.gps.glng);
+    }
+    i+=strlen(&buf[i]);
+    memmove(&buf[i]-5,&buf[i]-6,6);
+    *(&buf[i]-6)='.',
+    i++;
+    
+    if(device_comps.gps.glat<0)
+    {
+        sprintf(&buf[i],"GLAT:%07ld;",device_comps.gps.glat);
+    }
+    else
+    {
+        sprintf(&buf[i],"GLAT:%06ld;",device_comps.gps.glat);
+    }
+    i+=strlen(&buf[i]);
+    memmove(&buf[i]-5,&buf[i]-6,6);
+    *(&buf[i]-6)='.',
+    i++;
+    
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,netComps.net_info.iccid,20);
+    sprintf(&buf[i],"CCID:%s;",msg);
+    i+=strlen(&buf[i]);
+    
+
+    temp=device_comps.batt;
+    if(temp<31) {temp=0;}
+    else if(temp>36) {temp=10;}
+    else {temp=(temp-31)*2;}
+    sprintf(&buf[i],"DBAT:%d;",temp);
+    i+=strlen(&buf[i]);
+    
+    
+    temp=(int)netComps.net_info.Csq*10/31;
+    if(temp>10) {temp=0;}//Csq=99;
+    sprintf(&buf[i],"CSQ:%d;",temp);
+    i+=strlen(&buf[i]);
+    
+
+    //sprintf(&buf[i],"KD:%s;","");
+    //i+=strlen(&buf[i]);
+    
+    sprintf(&buf[i],"KD:");
+    i+=strlen(&buf[i]);
+    i+=AddTp((unsigned char *)&buf[i]);
+    buf[i++]=';';
+    
+/**************start measure data*****************/
+    sprintf(&buf[i],"DQT:%s;","C_5_A");
+    i+=strlen(&buf[i]);
+    
+
+    if(device_comps.calibration_param.unit&0x0f)
+    {
+        temp=device_comps.current_press;
+    }
+    else
+    {
+        temp=device_comps.current_press*1000;
+    }
+    
+    
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.sensor_info.id,sizeof(device_comps.sensor_info.id));
+    sprintf(&buf[i],"DQ1:%s",msg);
+    i+=strlen(&buf[i]);
+   
+
+    #ifdef MD_HIGH
+     sprintf(&buf[i],"_%0.3fm",(float)device_comps.current_high/pwr(device_comps.high_calibration_param.dot));//
+    #else
+     if(device_comps.calibration_param.is_calibrated)
+     {
+        sprintf(&buf[i],"_%ld",(long)( (float)temp/pwr(device_comps.calibration_param.dot)*102.04) );//kpa->m  /9.8 *1000 mm
+     }
+     else
+     {
+     
+ sprintf(&buf[i],"_00");
+     }
+    #endif
+    i+=strlen(&buf[i]);
+
+    sprintf(&buf[i],"_00.0;");//(float)device_comps.current_temp/10);
+    i+=strlen(&buf[i]);
+    
+
+    /**************end measure data*****************/
+
+
+    sprintf(&buf[i],"MD:");
+    i+=strlen(&buf[i]);
+    i+=AddTp((unsigned char *)&buf[i]);
+    buf[i++]=';';
+
+    sprintf(&buf[i],"END;");
+    i+=strlen(&buf[i]);
+
+
+   // sprintf(&buf[i],"report event:%d;",event);
+   // i+=strlen(&buf[i]);
+
+    return i;
+
 }
 
-static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
+static int encapsulate_self_pack(char *const buf,int event)
 {
     int i=0;
     long temp=0;
@@ -266,35 +408,26 @@ static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
 //    i+=AddLastSamplTps(&buf[i]);
 //    
 //    return i;
+
     memset(msg,0,sizeof(msg));
     memcpy(msg,&device_comps.manufacturer_info.name,sizeof(device_comps.manufacturer_info.name));
     sprintf(&buf[i],"$%s$;",msg);
     i+=strlen(&buf[i]);
-    
-    memset(msg,0,sizeof(msg));
-    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.type));
-    sprintf(&buf[i],"DTYPE:%s;",msg);
-    i+=strlen(&buf[i]);
-    
-    memset(msg,0,sizeof(msg));
-    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.id));
-    sprintf(&buf[i],"DSN:%s;",msg);
-    i+=strlen(&buf[i]);
-    //i+=AddAddr(&buf[i]);
-   // buf[i++]=';';
-    
 
-    sprintf(&buf[i],"START;");
+    sprintf(&buf[i],"ID:");
     i+=strlen(&buf[i]);
-
+    i+=AddAddr((unsigned char *)&buf[i]);
+    buf[i++]=';';
     
+  
+   
     if(device_comps.gps.glng<0)
     {
-        sprintf(&buf[i],"GLNG:%07ld;",device_comps.gps.glng);
+        sprintf(&buf[i],"LNG:%07ld;",device_comps.gps.glng);
     }
     else
     {
-        sprintf(&buf[i],"GLNG:%06ld;",device_comps.gps.glng);
+        sprintf(&buf[i],"LNG:%06ld;",device_comps.gps.glng);
     }
     i+=strlen(&buf[i]);
     memmove(&buf[i]-5,&buf[i]-6,6);
@@ -303,281 +436,307 @@ static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
     
     if(device_comps.gps.glat<0)
     {
-        sprintf(&buf[i],"GLNG:%07ld;",device_comps.gps.glat);
+        sprintf(&buf[i],"LAT:%07ld;",device_comps.gps.glat);
     }
     else
     {
-        sprintf(&buf[i],"GLNG:%06ld;",device_comps.gps.glat);
+        sprintf(&buf[i],"LAT:%06ld;",device_comps.gps.glat);
     }
     i+=strlen(&buf[i]);
     memmove(&buf[i]-5,&buf[i]-6,6);
     *(&buf[i]-6)='.',
     i++;
     
- 
-
     memset(msg,0,sizeof(msg));
     memcpy(msg,netComps.net_info.iccid,20);
-    sprintf(&buf[i],"CCID:%s;",msg);
+    sprintf(&buf[i],"ICCID:%s;",msg);
     i+=strlen(&buf[i]);
-    
 
-    temp=device_comps.batt;
-    if(temp<31) {temp=0;}
-    else if(temp>36) {temp=10;}
-    else {temp=(temp-31)*2;}
-    sprintf(&buf[i],"DBAT:%d;",temp);
+    sprintf(&buf[i],"VBATT:%d.",device_comps.batt/10);
+    i+=strlen(&buf[i]);
+    sprintf(&buf[i],"%dV;",device_comps.batt%10);
     i+=strlen(&buf[i]);
     
-    
-    temp=(int)netComps.net_info.Csq*10/31;
-    if(temp>10) {temp=0;}//Csq=99;
-    sprintf(&buf[i],"CSQ:%d;",temp);
+    sprintf(&buf[i],"CSQ:%d;",netComps.net_info.Csq);
     i+=strlen(&buf[i]);
     
-
-    sprintf(&buf[i],"KD:%s;","");
+    temp=formatData4fixDot(device_comps.calibration_param.y[3],device_comps.calibration_param.dot);
+    sprintf(&buf[i],"PFS:%ld.",temp/10000);
     i+=strlen(&buf[i]);
-    
-    
-/**************start measure data*****************/
-    sprintf(&buf[i],"DQT:%s;","C_5_A");
-    i+=strlen(&buf[i]);
-    
-
     if(device_comps.calibration_param.unit&0x0f)
     {
-        temp=device_comps.current_press;
+        sprintf(&buf[i],"%dKPa;",temp%10000);
     }
     else
     {
-        temp=device_comps.current_press*1000;
+        sprintf(&buf[i],"%dMPa;",temp%10000);
     }
-    
-    
-    memset(msg,0,sizeof(msg));
-    memcpy(msg,&device_comps.sensor_info.id,sizeof(device_comps.sensor_info.id));
-    sprintf(&buf[i],"DQ1:%s",msg);
-    i+=strlen(&buf[i]);
-    //i+=AddAddr(&buf[i]);
-    
-    sprintf(&buf[i],"_%0.3f",(float)temp/pwr(device_comps.calibration_param.dot)*100);//kpa->mm
     i+=strlen(&buf[i]);
 
-    sprintf(&buf[i],"_%0.1f;",(float)device_comps.current_temp/10);
+    temp=formatData4fixDot(device_comps.current_press,device_comps.calibration_param.dot);
+    sprintf(&buf[i],"PFS:%ld.",temp/10000);
     i+=strlen(&buf[i]);
-    
-
-    /**************end measure data*****************/
-
-
-    sprintf(&buf[i],"MD:");
+    if(device_comps.calibration_param.unit&0x0f)
+    {
+        sprintf(&buf[i],"%dKPa;",temp%10000);
+    }
+    else
+    {
+        sprintf(&buf[i],"%dMPa;",temp%10000);
+    }
     i+=strlen(&buf[i]);
-    i+=AddTp(&buf[i]);
+
+    sprintf(&buf[i],"TEMP:%ld.",device_comps.current_temp/10);
+    i+=strlen(&buf[i]);
+    sprintf(&buf[i],"%d;",device_comps.current_temp%10);
+    i+=strlen(&buf[i]);
+
+    sprintf(&buf[i],"TIME:");
+    i+=strlen(&buf[i]);
+    i+=AddTp((unsigned char *)&buf[i]);
     buf[i++]=';';
+
+    sprintf(&buf[i],"EVENT:%d;",event);
+    i+=strlen(&buf[i]);
 
     sprintf(&buf[i],"END;");
     i+=strlen(&buf[i]);
-
-
-    sprintf(&buf[i],"report event:%d;",event);
-    i+=strlen(&buf[i]);
-
     
     return i;
+
+}
+
+static int Encapsulate_dataPush_package(char *const buf,int event)//6.4.3
+{
+    
+    #if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN) 
+     return encapsulate_zhian_pack(buf,event);
+    #else
+     return encapsulate_self_pack(buf,event);
+    #endif
+    
 }
 
 
 
-static int Analysis_downstream_package(unsigned char *const buf,unsigned int len,unsigned char *address_field)
+static int Analysis_downstream_package(char const* buf,unsigned int length,unsigned char *address_field)
 {
-//        *address_field=buf[0];
-//        if((buf[0]==0xaa)&&(buf[1]==0xaa)&&(buf[2]==0x00)&&(buf[3]==0x00))
-//        {
-//            return 0;
-//        }
-//        else if(buf[0]>=40&&buf[0]<=49)
-//        {
-//            return 0;
-//        }
-//        else 
-//    	{
-//    		return 1;
-//    	}
-    	if(len>0)
-    	{
-    	    return 0;
-    	}
-}
+        char *find;
+        char *p;
+        int len;
+     #if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN) 
+        char  msg1[32]="";
+        char   msg[32]="";
+        find=strstr(buf,"DSN:");
+        if(!find)
+        {
+            return 1;
+        }
+        find+=strlen("DSN:");
+        p=strchr(find,';');    
+        if(!p)
+        {
+             return 1;
+        }
+        len=p-find;
+        if(len>sizeof(device_comps.device_info.id))
+        {
+            return 1;
+        }
+        strncpy(msg,find,len);
+        memcpy(msg1,&device_comps.device_info.id,sizeof(device_comps.device_info.id));
+        return strcmp(msg1,msg);
+     #else
+        find=strstr(buf,"ID:");
+        if(!find)
+        {
+            return 1;
+        }
+        find+=strlen("ID:");
+        p=strchr(find,';');    
+        if(!p)
+        {
+             return 1;
+        }
+        len=p-find;
+        if(len!=14)
+        {
+            return 1;
+        }
+        return VerifyMeterId((unsigned char *)find,device_comps.device_addr.addr);
+     #endif
+}        
 
-static int  AddMethodName(unsigned char name,unsigned char *buf)
- {      
-	unsigned char i=0;
-	switch(name)
-	{
-        case MD_SET_REPORT_TIME_MSGID: 
-            buf[i++]=strlen("setReportTime");//
-            memcpy(&buf[i],"setReportTime",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_GET_REPORT_TIME_MSGID: 
-            buf[i++]=strlen("getReportTime");//
-            memcpy(&buf[i],"getReportTime",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_SET_PALARM_THRESHOLD_MSGID:
-            buf[i++]=strlen("setPAlarmThreshold");//
-            memcpy(&buf[i],"setPAlarmThreshold",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_GET_PALARM_THRESHOLD_MSGID: 
-            buf[i++]=strlen("getPAlarmThreshold");//
-            memcpy(&buf[i],"getPAlarmThreshold",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_SET_TALARM_THRESHOLD_MSGID:
-            buf[i++]=strlen("getTAlarmThreshold");//
-            memcpy(&buf[i],"getTAlarmThreshold",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_GET_TALARM_THRESHOLD_MSGID: 
-            buf[i++]=strlen("getTAlarmThreshold");//
-            memcpy(&buf[i],"getTAlarmThreshold",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_GET_DEVICE_INFO_MSGID:
-            buf[i++]=strlen("getDeviceInfo");//
-            memcpy(&buf[i],"getDeviceInfo",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_SET_ACCESS_ADDR_MSGID:
-         buf[i++]=strlen("setAccessAddr");//
-            memcpy(&buf[i],"setAccessAddr",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_GET_ACCESS_ADDR_MSGID: 
-           buf[i++]=strlen("getAccessAddr");//
-            memcpy(&buf[i],"getAccessAddr",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-        case MD_SET_DEVICE_OFFLINE_MSGID:  
-		    buf[i++]=strlen("setDeviceOffline");//
-            memcpy(&buf[i],"setDeviceOffline",buf[i-1]);//
-            i+=buf[i-1]; 
-            return i;
-		default:
-		        buf[i++]=0;//len
-			return i;
-	}
-	return i;
- }
-static void dealAckData(unsigned char address_fiel,unsigned int midId)
-{
+
+//static int  AddMethodName(unsigned char name,unsigned char *buf)
+// {      
+//	unsigned char i=0;
+//	switch(name)
+//	{
+//        case MD_SET_REPORT_TIME_MSGID: 
+//            buf[i++]=strlen("setReportTime");//
+//            memcpy(&buf[i],"setReportTime",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_GET_REPORT_TIME_MSGID: 
+//            buf[i++]=strlen("getReportTime");//
+//            memcpy(&buf[i],"getReportTime",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_SET_PALARM_THRESHOLD_MSGID:
+//            buf[i++]=strlen("setPAlarmThreshold");//
+//            memcpy(&buf[i],"setPAlarmThreshold",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_GET_PALARM_THRESHOLD_MSGID: 
+//            buf[i++]=strlen("getPAlarmThreshold");//
+//            memcpy(&buf[i],"getPAlarmThreshold",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_SET_TALARM_THRESHOLD_MSGID:
+//            buf[i++]=strlen("getTAlarmThreshold");//
+//            memcpy(&buf[i],"getTAlarmThreshold",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_GET_TALARM_THRESHOLD_MSGID: 
+//            buf[i++]=strlen("getTAlarmThreshold");//
+//            memcpy(&buf[i],"getTAlarmThreshold",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_GET_DEVICE_INFO_MSGID:
+//            buf[i++]=strlen("getDeviceInfo");//
+//            memcpy(&buf[i],"getDeviceInfo",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_SET_ACCESS_ADDR_MSGID:
+//         buf[i++]=strlen("setAccessAddr");//
+//            memcpy(&buf[i],"setAccessAddr",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_GET_ACCESS_ADDR_MSGID: 
+//           buf[i++]=strlen("getAccessAddr");//
+//            memcpy(&buf[i],"getAccessAddr",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//        case MD_SET_DEVICE_OFFLINE_MSGID:  
+//		    buf[i++]=strlen("setDeviceOffline");//
+//            memcpy(&buf[i],"setDeviceOffline",buf[i-1]);//
+//            i+=buf[i-1]; 
+//            return i;
+//		default:
+//		        buf[i++]=0;//len
+//			return i;
+//	}
+//	return i;
+// }
+ 
+//static void dealAckData(unsigned char address_fiel,unsigned int midId)
+//{
    
-    unsigned int  i=0;
-	memset(protocolMisc.buf,0,sizeof(protocolMisc.buf));
-	protocolMisc.buf[i++]=address_fiel+0x20;//The same msgID
-	i+=AddMethodName(address_fiel,&protocolMisc.buf[i]);
-	protocolMisc.buf[i++]=0;//errCode
-	switch(address_fiel)
-	{
-        case  MD_SET_ACCESS_ADDR_MSGID://
-        case  MD_SET_REPORT_TIME_MSGID :   
-        case  MD_SET_DEVICE_OFFLINE_MSGID:
-        case  MD_SET_PALARM_THRESHOLD_MSGID:
-        case  MD_SET_TALARM_THRESHOLD_MSGID:
-              break;
-        case  MD_GET_REPORT_TIME_MSGID:
-            protocolMisc.buf[i++]=device_comps.report_param.min;
-            protocolMisc.buf[i++]=device_comps.report_param.hour;
-            protocolMisc.buf[i++]=device_comps.report_param.hour_Interval;
-            protocolMisc.buf[i++]=device_comps.report_param.disFactor>>8;
-            protocolMisc.buf[i++]=device_comps.report_param.disFactor;
-            break;
+//    unsigned int  i=0;
+//	memset(protocolMisc.buf,0,sizeof(protocolMisc.buf));
+//	protocolMisc.buf[i++]=address_fiel+0x20;//The same msgID
+//	i+=AddMethodName(address_fiel,&protocolMisc.buf[i]);
+//	protocolMisc.buf[i++]=0;//errCode
+//	switch(address_fiel)
+//	{
+//        case  MD_SET_ACCESS_ADDR_MSGID://
+//        case  MD_SET_REPORT_TIME_MSGID :   
+//        case  MD_SET_DEVICE_OFFLINE_MSGID:
+//        case  MD_SET_PALARM_THRESHOLD_MSGID:
+//        case  MD_SET_TALARM_THRESHOLD_MSGID:
+//              break;
+//        case  MD_GET_REPORT_TIME_MSGID:
+//            protocolMisc.buf[i++]=device_comps.report_param.min;
+//            protocolMisc.buf[i++]=device_comps.report_param.hour;
+//            protocolMisc.buf[i++]=device_comps.report_param.hour_Interval;
+//            protocolMisc.buf[i++]=device_comps.report_param.disFactor>>8;
+//            protocolMisc.buf[i++]=device_comps.report_param.disFactor;
+//            break;
 
-        case  MD_GET_PALARM_THRESHOLD_MSGID:
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper>>24;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper>>16;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper>>8;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper;
+//        case  MD_GET_PALARM_THRESHOLD_MSGID:
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper>>24;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper>>16;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper>>8;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_upper;
 
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower>>24;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower>>16;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower>>8;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower>>24;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower>>16;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower>>8;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_high_lower;
 
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper>>24;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper>>16;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper>>8;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper>>24;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper>>16;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper>>8;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_upper;
 
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower>>24;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower>>16;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower>>8;
-            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower>>24;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower>>16;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower>>8;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.press_low_lower;
 
-            protocolMisc.buf[i++]=device_comps.alarm_param.unit;
-            break;
-        case  MD_GET_TALARM_THRESHOLD_MSGID:
-            protocolMisc.buf[i++]=device_comps.alarm_param.temp_high>>8;
-			protocolMisc.buf[i++]=device_comps.alarm_param.temp_high;
-			protocolMisc.buf[i++]=device_comps.alarm_param.temp_low>>8;
-			protocolMisc.buf[i++]=device_comps.alarm_param.temp_low;
-            break;
+//            protocolMisc.buf[i++]=device_comps.alarm_param.unit;
+//            break;
+//        case  MD_GET_TALARM_THRESHOLD_MSGID:
+//            protocolMisc.buf[i++]=device_comps.alarm_param.temp_high>>8;
+//			protocolMisc.buf[i++]=device_comps.alarm_param.temp_high;
+//			protocolMisc.buf[i++]=device_comps.alarm_param.temp_low>>8;
+//			protocolMisc.buf[i++]=device_comps.alarm_param.temp_low;
+//            break;
 
-        case  MD_GET_DEVICE_INFO_MSGID:
-            i+=AddAddr(&protocolMisc.buf[i]);
-            protocolMisc.buf[i++]=MD_FL_VER;//FL_VER hdware ver
-            protocolMisc.buf[i++]=MD_FL_VER ;//FL_VER swware ver
+//        case  MD_GET_DEVICE_INFO_MSGID:
+//            i+=AddAddr(&protocolMisc.buf[i]);
+//            protocolMisc.buf[i++]=MD_FL_VER;//FL_VER hdware ver
+//            protocolMisc.buf[i++]=MD_FL_VER ;//FL_VER swware ver
 
-            protocolMisc.buf[i++]=strlen(netComps.net_info.firmhdVer)>sizeof(netComps.net_info.firmhdVer)?sizeof(netComps.net_info.firmhdVer):strlen(netComps.net_info.firmhdVer);//moudle swver len
-            memcpy(&protocolMisc.buf[i],netComps.net_info.firmhdVer,protocolMisc.buf[i-1]);//r
-            i+=protocolMisc.buf[i-1];
+//            protocolMisc.buf[i++]=strlen(netComps.net_info.firmhdVer)>sizeof(netComps.net_info.firmhdVer)?sizeof(netComps.net_info.firmhdVer):strlen(netComps.net_info.firmhdVer);//moudle swver len
+//            memcpy(&protocolMisc.buf[i],netComps.net_info.firmhdVer,protocolMisc.buf[i-1]);//r
+//            i+=protocolMisc.buf[i-1];
 
-            protocolMisc.buf[i++]=strlen(netComps.net_info.firmVer)>sizeof(netComps.net_info.firmVer)?sizeof(netComps.net_info.firmVer):strlen(netComps.net_info.firmVer);//moudle swver len
-            memcpy(&protocolMisc.buf[i],netComps.net_info.firmVer,protocolMisc.buf[i-1]);//
-            i+=protocolMisc.buf[i-1];
+//            protocolMisc.buf[i++]=strlen(netComps.net_info.firmVer)>sizeof(netComps.net_info.firmVer)?sizeof(netComps.net_info.firmVer):strlen(netComps.net_info.firmVer);//moudle swver len
+//            memcpy(&protocolMisc.buf[i],netComps.net_info.firmVer,protocolMisc.buf[i-1]);//
+//            i+=protocolMisc.buf[i-1];
 
-            protocolMisc.buf[i++]=strlen(netComps.net_info.imei)>sizeof(netComps.net_info.imei)?sizeof(netComps.net_info.imei):strlen(netComps.net_info.imei);//moudle swver len
-            memcpy(&protocolMisc.buf[i],netComps.net_info.imei,protocolMisc.buf[i-1]);//
-            i+=protocolMisc.buf[i-1];
+//            protocolMisc.buf[i++]=strlen(netComps.net_info.imei)>sizeof(netComps.net_info.imei)?sizeof(netComps.net_info.imei):strlen(netComps.net_info.imei);//moudle swver len
+//            memcpy(&protocolMisc.buf[i],netComps.net_info.imei,protocolMisc.buf[i-1]);//
+//            i+=protocolMisc.buf[i-1];
 
-            protocolMisc.buf[i++]=strlen(netComps.net_info.iccid)>sizeof(netComps.net_info.iccid)?sizeof(netComps.net_info.iccid):strlen(netComps.net_info.iccid);//moudle swver len
-            memcpy(&protocolMisc.buf[i],netComps.net_info.iccid,protocolMisc.buf[i-1]);//
-            i+=protocolMisc.buf[i-1];
+//            protocolMisc.buf[i++]=strlen(netComps.net_info.iccid)>sizeof(netComps.net_info.iccid)?sizeof(netComps.net_info.iccid):strlen(netComps.net_info.iccid);//moudle swver len
+//            memcpy(&protocolMisc.buf[i],netComps.net_info.iccid,protocolMisc.buf[i-1]);//
+//            i+=protocolMisc.buf[i-1];
 
-            protocolMisc.buf[i++]=strlen(netComps.net_info.imsi)>sizeof(netComps.net_info.imsi)?sizeof(netComps.net_info.imsi):strlen(netComps.net_info.imsi);//moudle swver len
-            memcpy(&protocolMisc.buf[i],netComps.net_info.imsi,protocolMisc.buf[i-1]);//
-            i+=protocolMisc.buf[i-1];
-            break;
-        case  MD_GET_ACCESS_ADDR_MSGID:
-            {
-                char IpNum[25]="";
+//            protocolMisc.buf[i++]=strlen(netComps.net_info.imsi)>sizeof(netComps.net_info.imsi)?sizeof(netComps.net_info.imsi):strlen(netComps.net_info.imsi);//moudle swver len
+//            memcpy(&protocolMisc.buf[i],netComps.net_info.imsi,protocolMisc.buf[i-1]);//
+//            i+=protocolMisc.buf[i-1];
+//            break;
+//        case  MD_GET_ACCESS_ADDR_MSGID:
+//            {
+//                char IpNum[25]="";
                 
-                sprintf(IpNum+strlen(IpNum),"%d.",device_comps.access_param.ip[0]);
-                sprintf(IpNum+strlen(IpNum),"%d.",device_comps.access_param.ip[1]);
-                sprintf(IpNum+strlen(IpNum),"%d.",device_comps.access_param.ip[2]);
-                sprintf(IpNum+strlen(IpNum),"%d,",device_comps.access_param.ip[3]);
-                sprintf(IpNum+strlen(IpNum),"%u",device_comps.access_param.port);
-                protocolMisc.buf[i++]=strlen(IpNum)>sizeof(IpNum)?sizeof(IpNum):strlen(IpNum);//
-                memcpy(&protocolMisc.buf[i],IpNum,protocolMisc.buf[i-1]);//New IP
-                i+=protocolMisc.buf[i-1];
-            }
+//                sprintf(IpNum+strlen(IpNum),"%d.",device_comps.access_param.ip[0]);
+//                sprintf(IpNum+strlen(IpNum),"%d.",device_comps.access_param.ip[1]);
+//                sprintf(IpNum+strlen(IpNum),"%d.",device_comps.access_param.ip[2]);
+//                sprintf(IpNum+strlen(IpNum),"%d,",device_comps.access_param.ip[3]);
+//                sprintf(IpNum+strlen(IpNum),"%u",device_comps.access_param.port);
+//                protocolMisc.buf[i++]=strlen(IpNum)>sizeof(IpNum)?sizeof(IpNum):strlen(IpNum);//
+//                memcpy(&protocolMisc.buf[i],IpNum,protocolMisc.buf[i-1]);//New IP
+//                i+=protocolMisc.buf[i-1];
+//            }
             
-            break;
-       default:
-		          break;
-	}
-    protocolMisc.buf[i++]=midId>>8;//The same MIDidH
-	protocolMisc.buf[i++]=midId;//The same MIDidL
+//            break;
+//       default:
+//		          break;
+//	}
+//    protocolMisc.buf[i++]=midId>>8;//The same MIDidH
+//	protocolMisc.buf[i++]=midId;//The same MIDidL
 	
-	protocolComps.msg;//=protocolMisc.buf;
-	protocolComps.msgLen=i;
-	protocolComps.sw._bit.DataRdy=1;
-}
+//	protocolComps.msg;//=protocolMisc.buf;
+//	protocolComps.msgLen=i;
+//	protocolComps.sw._bit.DataRdy=1;
+//}
 
 
-static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
+static int  DealDownCmd(char  * const buf,unsigned int Len)
 {
 //        unsigned int   i=15;
 //        unsigned int   err=1;
@@ -698,33 +857,45 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
 //	}
 //	return err;
     int i=0;
-    char *const buf=protocolMisc.buf;
     char *find;
     char  msg[32]="";
+
+     #if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN) 
+     const char *sample_interval="HCJG:";
+     const char *ip="SA:";
+     const char *rport="PORT";
+     #else
+     const char *sample_interval="INR:";
+     const char *ip="RSA:";
+     const char *rport="PORT";
+     #endif
 		
     if(1)
     {
-        find=strstr(buf,"HCJG:");
+        find=strstr(buf,sample_interval);
         if(find)
         {
     	    long    hcjg;	
-    	    find+=strlen("HCJG:");
-            hcjg=atol(find);
-            if(hcjg<65536)
-            {
-                   device_comps.report_interval_timer=0;
-                   device_comps.report_param.min_Interval=hcjg;
-    			   device_comps.report_param.hour_Interval=hcjg;
-    			   device_comps.report_param.cs=Check_Sum_5A(&device_comps.report_param, &device_comps.report_param.cs-(unsigned char *)&device_comps.report_param);
-    			   device_comps.save_report_param(&device_comps.report_param,sizeof(device_comps.report_param));
+    	    find+=strlen(sample_interval);
+    	    if(*find>='0'  && *find<='9')
+    	    {
+                hcjg=atol(find);
+                if(hcjg<65536)
+                {
+                       device_comps.report_interval_timer=0;
+                       device_comps.report_param.min_Interval=hcjg;
+        			   device_comps.report_param.hour_Interval=hcjg;
+        			   device_comps.report_param.cs=Check_Sum_5A((unsigned char *)&device_comps.report_param, &device_comps.report_param.cs-(unsigned char *)&device_comps.report_param);
+        			   device_comps.save_report_param(&device_comps.report_param,sizeof(device_comps.report_param));
+                }
             }
         }
 
-        find=strstr(buf,"PORT:");
+        find=strstr(buf,rport);
         if(find)
         {
     	    unsigned int port;	
-    	    find+=strlen("PORT:");
+    	    find+=strlen(rport);
             port=atol(find);
             if(port>0)
             {
@@ -743,11 +914,11 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
             }
         }
 
-        find=strstr(buf,"SA:");
+        find=strstr(buf,ip);
         if(find)
         {
     	    int len;	
-    	    find+=strlen("SA:");
+    	    find+=strlen(ip);
     	    len=strstr(find,";")- find;
             
             if( len>6&& len<26)
@@ -773,7 +944,7 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
     }
     memset(protocolMisc.buf,0,sizeof(protocolMisc.buf));
     
-    
+   #if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN) 
     memset(msg,0,sizeof(msg));
     memcpy(msg,&device_comps.manufacturer_info.name,sizeof(device_comps.manufacturer_info.name));
     sprintf(&buf[i],"$%s$;",msg);
@@ -785,8 +956,8 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
     i+=strlen(&buf[i]);
     
     memset(msg,0,sizeof(msg));
-    memcpy(msg,&device_comps.device_info.type,sizeof(device_comps.device_info.id));
-    sprintf(&buf[i],"DSN:%s;",msg);
+    memcpy(msg,&device_comps.device_info.id,sizeof(device_comps.device_info.id));
+    sprintf(&buf[i],"D_SN:%s;",msg);
     i+=strlen(&buf[i]);
     
     
@@ -794,17 +965,36 @@ static int  DealDownCmd(unsigned char const *buff,unsigned int Len)
     sprintf(&buf[i],"START;");
     i+=strlen(&buf[i]);
 
-    sprintf(&buf[i],"RCVD:%d;",Len);
+    //sprintf(&buf[i],"RCVD:%d;",Len);
+    sprintf(&buf[i],"RCVD:0;");
     i+=strlen(&buf[i]);
 
     sprintf(&buf[i],"END;");
     i+=strlen(&buf[i]);
     
+  #else
+    memset(msg,0,sizeof(msg));
+    memcpy(msg,&device_comps.manufacturer_info.name,sizeof(device_comps.manufacturer_info.name));
+    sprintf(&buf[i],"$%s$;",msg);
+    i+=strlen(&buf[i]);
+
+    sprintf(&buf[i],"ID:");
+    i+=strlen(&buf[i]);
+    i+=AddAddr((unsigned char *)&buf[i]);
+    buf[i++]=';';
+
+    sprintf(&buf[i],"RCVD:%d;",Len);
+    i+=strlen(&buf[i]);
+
+    sprintf(&buf[i],"END;");
+    i+=strlen(&buf[i]);
+   #endif
+   
     protocolComps.msgLen=i;
-    protocolComps.msg;//=protocolMisc.buf;
+//    protocolComps.msg;//=protocolMisc.buf;
     protocolComps.sw._bit.DataRdy=1;
 
-
+	return 0;
 }
 
 static void Srv_Protol(int event)
@@ -817,8 +1007,8 @@ static void Srv_Protol(int event)
             if(!protocolComps.sw._bit.DataRdy)
             {
                 memset(protocolMisc.buf,0,sizeof(protocolMisc.buf));
-    			protocolComps.msgLen=Encapsulate_dataPush_package(protocolMisc.buf,event);
-    			protocolComps.msg;//=protocolMisc.buf;	
+    			protocolComps.msgLen=Encapsulate_dataPush_package((char *)protocolMisc.buf,event);
+   // 			protocolComps.msg;//=protocolMisc.buf;	
     		    protocolComps.sw._bit.DataRdy=1; //send a message to bc35 send
     		    protocolComps.AckTmr=10;
                 protocolMisc.step++;
@@ -834,7 +1024,7 @@ static void Srv_Protol(int event)
 			memset(protocolMisc.buf,0,sizeof(protocolMisc.buf));
 			memcpy(protocolMisc.buf,netComps.msg,netComps.msgLen);
 			protocolComps.msgLen=netComps.msgLen;
-			if(!Analysis_downstream_package(protocolMisc.buf,protocolComps.msgLen,&address_field))//Remove the link layer protocol (68, len crc etc)
+			if(!Analysis_downstream_package((char *)protocolMisc.buf,protocolComps.msgLen,&address_field))//Remove the link layer protocol (68, len crc etc)
 			{
  //               netComps.op_window_tmr=5;
 //                if(address_field>=40&&address_field<=49)
@@ -850,7 +1040,7 @@ static void Srv_Protol(int event)
 //                {
 //
 //                }
-                   DealDownCmd(protocolMisc.buf,protocolComps.msgLen);
+                   DealDownCmd((char *)protocolMisc.buf,protocolComps.msgLen);
                   
             }
 			else
@@ -915,10 +1105,17 @@ static void Srv_Protol(int event)
 	
 }
 
-
-
-
-static void protocolComps_task_handle()
+static void protocolComps_report_callback(void)
+{
+    #ifdef   MD_EXT_MEASUREMENT_MODULE
+       #if (MD_EXT_MEASUREMENT_MODULE_TYPE==MD_RAD)
+           
+       #else
+           pressComps.sw._bit.on=1;
+       #endif 
+	#endif
+}
+static void protocolComps_task_handle(void)
 {
 	if(protocolMisc.event_index<0)
 	{
@@ -930,7 +1127,7 @@ static void protocolComps_task_handle()
 				protocolMisc.event_index=i;
 				if(!protocolMisc.event_index)
 				{
-                    device_comps.gps.isActive=1;
+                    device_comps.gps.sw._bit.isActive=1;
 				}
                 protocolMisc.step=0;
 				protocolMisc.reRryTimes=2;
@@ -938,21 +1135,32 @@ static void protocolComps_task_handle()
 	            protocolComps.sw._bit.dataPushYet=0;
                 protocolComps.sw._bit.dataPushYet1=0;
                 protocolComps.sw._bit.isAckTmrOut=0;
-				protocolComps.triggerIrq.All&=~((unsigned int)1<<protocolMisc.event_index);
+                protocolComps.triggerIrq.All&=~((unsigned int)1<<protocolMisc.event_index);
+                protocolComps_report_callback();
                 break;
 			}
 		}
 	}
 	
-	if(protocolMisc.event_index>-1)
+    #ifdef   MD_EXT_MEASUREMENT_MODULE
+       #if (MD_EXT_MEASUREMENT_MODULE_TYPE==MD_RAD)
+          
+       #else
+           if( pressComps.sw._bit.on || pressComps.sw._bit.window_running )
+			{
+			    return;
+			}
+       #endif 
+    #endif
+	
+if(protocolMisc.event_index>-1)
 	{
 		if(!netComps.St._bit.running)
 		{
 			netComps.St._bit.on=1;
-			
-			device_comps.report_param.triggerTimes++;
-			device_comps.report_param.cs=Check_Sum_5A(&device_comps.report_param, &device_comps.report_param.cs-(unsigned char *)&device_comps.report_param);
-    		device_comps.save_report_param(&device_comps.report_param,sizeof(device_comps.report_param));
+			cs123x_comps.stop();
+			pressComps.stop();//
+			radComps.stop();
 		}
 		else
 		{
@@ -967,7 +1175,7 @@ protocolComps_t protocolComps=
 {
     {0},
     {0},
-    protocolMisc.buf,
+    (unsigned char *)&protocolMisc.buf,
     0,
     30,
     &protocolMisc.step,

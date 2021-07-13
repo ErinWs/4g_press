@@ -361,15 +361,21 @@ static uint8 cs123x_read_io(void)
   return (uint8)MD_CS123X_DATA;
 }
 
-
-
 static void CS123x_Power_Down(void)
 {
 
     cs123x_io_dir_in();
 	cs123x_clk_high();
 	Delay(2);//must big than 100us
+	
 }
+static void cs123x_stop(void)
+{
+	CS123x_Power_Down();
+	cs123x_comps.sw._bit.running=0;
+    MD_SET_REF_3030C_OFF;
+}
+
 
 static void CS123x_Restart(void)
 {
@@ -569,12 +575,12 @@ void cs123x_task_handle(void)
             {
                 if(hum_comps.current_mode==EM_CAL_MODIFY_MODE)
                 {
-                    cs123x_comps.write_reg(&device_comps.high_p_convert_result[device_comps.high_p_pos++],0x51|MD_CH1_GAIN);//
+                    cs123x_comps.write_reg(&device_comps.high_p_convert_result[device_comps.high_p_pos++],0x61|MD_CH1_GAIN);//
                     device_comps.ad1_convert_result[device_comps.ad1_pos++]=device_comps.high_p_convert_result[device_comps.high_p_pos-1];
                 }
                 else
                 {
-                    cs123x_comps.write_reg(&device_comps.high_p_convert_result[device_comps.high_p_pos++],0x51|MD_CH1_GAIN);//  
+                    cs123x_comps.write_reg(&device_comps.high_p_convert_result[device_comps.high_p_pos++],0x61|MD_CH1_GAIN);//  
                     device_comps.ad1_convert_result[device_comps.ad1_pos++]=device_comps.high_p_convert_result[device_comps.high_p_pos-1];
                 }
             }
@@ -586,9 +592,8 @@ void cs123x_task_handle(void)
             cs123x_comps.current_channel%=2;
             if(cs123x_comps.init_channel== cs123x_comps.current_channel)
             {
-                cs123x_comps.power_down();
-                cs123x_comps.sw._bit.running=0;
-                MD_SET_REF_3030C_OFF;
+                cs123x_comps.stop();
+               
             }
             else
             {
@@ -601,11 +606,11 @@ void cs123x_task_handle(void)
             {
                 if(hum_comps.current_mode==EM_CAL_MODIFY_MODE)
                 {
-                    cs123x_comps.write_reg(&device_comps.temp_p_convert_result[device_comps.temp_p_pos++],0x50|MD_CH0_GAIN);//
+                    cs123x_comps.write_reg(&device_comps.temp_p_convert_result[device_comps.temp_p_pos++],0x60|MD_CH0_GAIN);//
                 }
                 else
                 {
-                    cs123x_comps.write_reg(&device_comps.temp_p_convert_result[device_comps.temp_p_pos++],0x50|MD_CH0_GAIN);//
+                    cs123x_comps.write_reg(&device_comps.temp_p_convert_result[device_comps.temp_p_pos++],0x60|MD_CH0_GAIN);//
                 }
              }
              else
@@ -616,10 +621,7 @@ void cs123x_task_handle(void)
             cs123x_comps.current_channel%=2;
             if(cs123x_comps.init_channel== cs123x_comps.current_channel)
             {
-                cs123x_comps.power_down();
-                cs123x_comps.sw._bit.running=0;
-                MD_SET_REF_3030C_OFF;
-               
+                cs123x_comps.stop();
             }
             else
             {
@@ -647,6 +649,7 @@ cs123x_comps_t cs123x_comps=
 	CS123x_WriteReg,//	void (*const write_reg )(long * ad,unsigned char dat); 
 	R_INTC2_Stop,//void (*const disale_interrup(void);
 	R_INTC2_Start,//void (*const enable_interrupt(void);
+	cs123x_stop,
 	cs123x_task_handle//void  ( *const task_handle)(void);
 };
 

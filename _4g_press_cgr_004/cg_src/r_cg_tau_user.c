@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements device driver for TAU module.
-* Creation Date: 2020/12/30 星期三
+* Creation Date: 2021/6/18 星期五
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -32,12 +32,14 @@ Includes
 #include "r_cg_macrodriver.h"
 #include "r_cg_tau.h"
 /* Start user code for include. Do not edit comment generated here */
+#include "rad.h"
 /* End user code. Do not edit comment generated here */
 #include "r_cg_userdefine.h"
 
 /***********************************************************************************************************************
 Pragma directive
 ***********************************************************************************************************************/
+#pragma interrupt r_tau0_channel1_interrupt(vect=INTTM01)
 /* Start user code for pragma. Do not edit comment generated here */
 /* End user code. Do not edit comment generated here */
 
@@ -47,6 +49,19 @@ Global variables and functions
 /* Start user code for global. Do not edit comment generated here */
 /* End user code. Do not edit comment generated here */
 
+/***********************************************************************************************************************
+* Function Name: r_tau0_channel1_interrupt
+* Description  : This function INTTM01 interrupt service routine.
+* Arguments    : None
+* Return Value : None
+***********************************************************************************************************************/
+static void __near r_tau0_channel1_interrupt(void)
+{
+    /* Start user code. Do not edit comment generated here */
+  
+    
+    /* End user code. Do not edit comment generated here */
+}
 
 /* Start user code for adding. Do not edit comment generated here */
 /* End user code. Do not edit comment generated here */

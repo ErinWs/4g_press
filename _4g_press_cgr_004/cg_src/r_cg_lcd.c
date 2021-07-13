@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements device driver for LCD module.
-* Creation Date: 2020/12/30 星期�?
+* Creation Date: 2021/6/18 星期五
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -86,7 +86,7 @@ void R_LCD_Create(void)
     PM5 &= 0x0CU;
     P7 &= 0x00U;
     PM7 &= 0x00U;
-    LCDC0 = _05_LCD_CLOCK_FSUB_FIL_6;//_06_LCD_CLOCK_FSUB_FIL_7;
+    LCDC0 = _06_LCD_CLOCK_FSUB_FIL_7;
     VLCD = _09_LCD_BOOST_VOLTAGE_125V;
 
     /* Change the waiting time according to the system */

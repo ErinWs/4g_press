@@ -18,11 +18,11 @@
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
-* File Name    : r_cg_cgc.c
+* File Name    : r_cg_pclbuz_user.c
 * Version      : Applilet4 for R7F0C003/004 V1.00.00.01 [01 Mar 2016]
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
-* Description  : This file implements device driver for CGC module.
+* Description  : This file implements device driver for PCLBUZ module.
 * Creation Date: 2021/6/18 星期五
 ***********************************************************************************************************************/
 
@@ -30,7 +30,7 @@
 Includes
 ***********************************************************************************************************************/
 #include "r_cg_macrodriver.h"
-#include "r_cg_cgc.h"
+#include "r_cg_pclbuz.h"
 /* Start user code for include. Do not edit comment generated here */
 /* End user code. Do not edit comment generated here */
 #include "r_cg_userdefine.h"
@@ -46,37 +46,6 @@ Global variables and functions
 ***********************************************************************************************************************/
 /* Start user code for global. Do not edit comment generated here */
 /* End user code. Do not edit comment generated here */
-
-/***********************************************************************************************************************
-* Function Name: R_CGC_Create
-* Description  : This function initializes the clock generator.
-* Arguments    : None
-* Return Value : None
-***********************************************************************************************************************/
-void R_CGC_Create(void)
-{
-    volatile uint16_t w_count;
-
-    /* Set fMX */
-    CMC = _00_CGC_HISYS_PORT | _10_CGC_SUB_OSC | _02_CGC_SUBMODE_NORMAL;
-    MSTOP = 1U;
-    /* Set fMAIN */
-    MCM0 = 0U;
-    /* Set fSUB */
-    XTSTOP = 0U;
-
-    /* Change the waiting time according to the system */
-    for (w_count = 0U; w_count <= CGC_SUBWAITTIME; w_count++)
-    {
-        NOP();
-    }
-    
-    OSMC = _00_CGC_SUBINHALT_ON | _00_CGC_RTC_IT_LCD_CLK_FSUB;
-    /* Set fCLK */
-    CSS = 0U;
-    /* Set fIH */
-    HIOSTOP = 0U;
-}
 
 
 /* Start user code for adding. Do not edit comment generated here */

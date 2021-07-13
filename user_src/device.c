@@ -5,6 +5,7 @@
 #include "r_cg_rtc.h"
 #include "r_cg_adc.h"
 #include "r_cg_tau.h"
+#include "r_cg_pclbuz.h"
 #include "device.h"
 #include "system.h"
 #include "net.h"
@@ -18,7 +19,8 @@
 #include "stdio.h"
 #include "string.h"
 #include "cs123x.h"
-
+#include "rad.h"
+#include "press.h"
 
   
 			
@@ -246,14 +248,14 @@ int save_device_sn(void const*buf,int len )
 {
     return _24cxx_comps.write(MD_DEVICE_SN_START_ADDR,buf,len);
 }
-int read_float_level_param(void *buf,int len )
+int read_level_param(void *buf,int len )
 {
-    return _24cxx_comps.read(MD_FLOAT_LEVEL_PARAM_START_ADDR,buf,len);
+    return _24cxx_comps.read(MD_LEVEL_PARAM_START_ADDR           ,buf,len);
 }
 
-int save_float_level_param(void const *buf,int len )
+int save_level_param(void const *buf,int len )
 {
-    return _24cxx_comps.write(MD_FLOAT_LEVEL_PARAM_START_ADDR,buf,len);
+    return _24cxx_comps.write(MD_LEVEL_PARAM_START_ADDR           ,buf,len);
 }
 
 int read_report_param(void *buf,int len)
@@ -306,6 +308,19 @@ int save_device_sensor(void const *buf,int len)
 return _24cxx_comps.write(MD_DEVICE_SENSOR_START_ADDR,buf,len);
 }
 
+static void start_buzzer(int timer)
+{
+    device_comps.buzzer.timer=timer;
+    device_comps.buzzer.sw._bit.on=1;
+    device_comps.buzzer.sw._bit.running=1;
+    
+}
+static void stop_buzzer(void)
+{
+    P0 &= 0xFBU;
+    PM0 |= ~0xFBU;
+    R_PCLBUZ0_Stop();
+}
  static void get_batt(void)
  {
      unsigned int adc;
@@ -324,7 +339,7 @@ return _24cxx_comps.write(MD_DEVICE_SENSOR_START_ADDR,buf,len);
      device_comps.sw._bit.adc_busy=1;
      R_ADC_Start();
      while(device_comps.sw._bit.adc_busy);
-     R_ADC_Get_Result(&adc);
+     R_ADC_Get_Result((uint16_t *)&adc);
      MD_SET_BAT_CTL_OFF;
      ADCE=0;
      
@@ -353,6 +368,10 @@ static  long calc_ad3_average(device_comps_t *const this)
     int   i=0;
     const int count=this->ad3_pos;
     unsigned long average=0;
+    if(!count)
+    {
+        return 0;
+    }
 	for(i=0;i<count;i++)
 	{
 		average+=this-> ad3_convert_result[i];
@@ -429,11 +448,13 @@ ret:
 static long calc_temp_p_temp_n_average(device_comps_t *const this)
 {
     int   i=0;
-    int   j=0;
     const int count=this->temp_p_pos;
-    long  temp_var;
     long average=0;
 	long difference[32]={0};//=malloc(count*sizeof(float));
+	if(!count)
+	{
+	    return 0;
+	}
 	for(i=0;i<count;i++)
 	{
 		difference[i]=this-> temp_p_convert_result[i]-this-> temp_n_convert_result[i];
@@ -529,11 +550,13 @@ ret:
 static long calc_high_p_high_n_average(device_comps_t *const this)
 {
     int   i=0;
-    int   j=0;
     const int count=this->high_p_pos;
-    long  high_var;
     long average=0;
 	long difference[32]={0};//=malloc(count*sizeof(float));
+	if(!count)
+    {
+        return 0;
+    }
 	for(i=0;i<count;i++)
 	{
 		difference[i]=this-> high_p_convert_result[i]-this-> high_n_convert_result[i];
@@ -579,7 +602,7 @@ static long calc_current_high(device_comps_t *const this)
 static long calc_current_volume(device_comps_t *const this)
 {
     
-	return this->current_high/10 *this->float_level_param.bottom_s;
+	return this->current_high/10 *this->level_param.bottom_s;
 }
 
 
@@ -588,11 +611,13 @@ static long calc_current_volume(device_comps_t *const this)
 static long  calc_ad1_ad2_average(device_comps_t *const this)
 {
     int   i=0;
-    int   j=0;
     const int count=this->ad1_pos;
-    long  temp_var;
     long average=0;
 	long difference[32]={0};//=malloc(count*sizeof(float));
+	if(!count)
+    {
+        return 0;
+    }
 	for(i=0;i<count;i++)
 	{
 		difference[i]=this-> ad1_convert_result[i]-this-> ad2_convert_result[i];
@@ -686,7 +711,7 @@ ret:
     press-=this->coe.press_clr_value;
 	if(press>this->calibration_param.y[3]*1/100)//>fs*1/100.
 	{
-		press;
+	
 	}
 	else
 	{
@@ -722,40 +747,40 @@ static int clr_press(void)
 
 static void device_comps_output_debug_info(device_comps_t const *const this)
 {
-	static int line_num=0;
-	int tx_num=0;
-	memset(this->debug_info,0,sizeof(this->debug_info));
-	if(line_num==0)
-	{
+//	static int line_num=0;
+//	int tx_num=0;
+//	memset(this->debug_info,0,sizeof(this->debug_info));
+//	if(line_num==0)
+//	{
 		
-		//start output attribute name(title)
-		sprintf(this->debug_info+strlen(this->debug_info),"AD1-AD2\t\t");//
-		sprintf(this->debug_info+strlen(this->debug_info),"ad2_pos\t\t");//
-		sprintf(this->debug_info+strlen(this->debug_info),"AD3\t\t");//signal_ferq_from_timer_ch0 extern event counter 
-		sprintf(this->debug_info+strlen(this->debug_info),"ad3_pos\r\n");//signal_freq
-		//end output attribute name(title)
-	}
-	else
-	{
-		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\t\t",this->ad1_ad2_average_result);
-		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\t\t",this->ad2_pos);
-		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\t\t",this->ad3_average_result);
-		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\r\n",this->ad3_pos);
+//		//start output attribute name(title)
+//		sprintf(this->debug_info+strlen(this->debug_info),"AD1-AD2\t\t");//
+//		sprintf(this->debug_info+strlen(this->debug_info),"ad2_pos\t\t");//
+//		sprintf(this->debug_info+strlen(this->debug_info),"AD3\t\t");//signal_ferq_from_timer_ch0 extern event counter 
+//		sprintf(this->debug_info+strlen(this->debug_info),"ad3_pos\r\n");//signal_freq
+//		//end output attribute name(title)
+//	}
+//	else
+//	{
+//		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\t\t",this->ad1_ad2_average_result);
+//		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\t\t",this->ad2_pos);
+//		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\t\t",this->ad3_average_result);
+//		sprintf(this->debug_info+strlen(this->debug_info),"%05ld\r\n",this->ad3_pos);
 		
-	}
-	line_num++;
-	if(line_num>=10)//Output attribute name(title) every 50 lines
-	{
-		line_num=0; 
-	}
-	tx_num=strlen(this->debug_info);
-	if(tx_num>=sizeof(this->debug_info))
-	{
-		memset(this->debug_info,0,sizeof(this->debug_info));
-		sprintf(this->debug_info,"Write sensor debug output buffer overflow\r\n"); 
-		tx_num=strlen(this->debug_info);
-	}
-	ircComps.write(this->debug_info,tx_num);
+//	}
+//	line_num++;
+//	if(line_num>=10)//Output attribute name(title) every 50 lines
+//	{
+//		line_num=0; 
+//	}
+//	tx_num=strlen(this->debug_info);
+//	if(tx_num>=sizeof(this->debug_info))
+//	{
+//		memset(this->debug_info,0,sizeof(this->debug_info));
+//		sprintf(this->debug_info,"Write sensor debug output buffer overflow\r\n"); 
+//		tx_num=strlen(this->debug_info);
+//	}
+//	ircComps.write(this->debug_info,tx_num);
 	
 	
 }
@@ -790,12 +815,17 @@ int get_gps_info_from_net(char const *loc)
     {
         return 1;
     }
-    
-    device_comps.gps.glat=glat;
-    device_comps.gps.glng=glng;
-    device_comps.gps.cs=Check_Sum_5A(&device_comps.gps, &device_comps.gps.cs-(unsigned char *)&device_comps.gps);
-    device_comps.save_gps_loc(&device_comps.gps,sizeof(device_comps.gps));
-    return 0;
+    device_comps.gps.loc_times++;
+    if(device_comps.gps.loc_times<2)
+    {
+        return 1;
+	}
+	device_comps.gps.glat=glat;
+	device_comps.gps.glng=glng;
+	device_comps.gps.cs=Check_Sum_5A(&device_comps.gps, &device_comps.gps.cs-(unsigned char *)&device_comps.gps);
+	device_comps.save_gps_loc(&device_comps.gps,sizeof(device_comps.gps));
+	device_comps.gps.loc_times=0;
+	return 0;
 }
 
 
@@ -822,11 +852,11 @@ static unsigned char device_comps_init(device_comps_t *const this)
         cs123x_comps.current_channel=cs123x_comps.init_channel;
         if(cs123x_comps.current_channel==0)
         {
-            cfg=0x50|MD_CH0_GAIN;
+            cfg=0x60|MD_CH0_GAIN;
         }
         else if(cs123x_comps.current_channel==1)
         {
-            cfg=0x51|MD_CH1_GAIN;
+            cfg=0x61|MD_CH1_GAIN;
         }
 		if(!cs123x_comps.Init(cfg))
 		{
@@ -902,6 +932,7 @@ static unsigned char device_comps_init(device_comps_t *const this)
 //        device_comps.4g_param.timer=0;
 //    }
 //}
+
 static void read_all_param(struct _DEVICE_COMPONENTS  *const this)
 {
     if(!device_comps.sw._bit.e2prom_driver_err)
@@ -968,11 +999,12 @@ static void read_all_param(struct _DEVICE_COMPONENTS  *const this)
 //            check_air_param();
 //           
 //        }
-        if(!read_float_level_param(&device_comps.float_level_param,sizeof(device_comps.float_level_param)))
+        if(!read_level_param(&device_comps.level_param,sizeof(device_comps.level_param)))
         {
-            if(device_comps.float_level_param.cs!=Check_Sum_5A(&device_comps.float_level_param, & device_comps.float_level_param.cs-(unsigned char *)&device_comps.float_level_param))
+            if(device_comps.level_param.cs!=Check_Sum_5A(&device_comps.level_param, & device_comps.level_param.cs-(unsigned char *)&device_comps.level_param))
             {
-                device_comps.float_level_param.bottom_s=1000;//1.000
+                device_comps.level_param.bottom_s=1000;//1.000
+                device_comps.level_param.sample_interval_value=10;//
             }
         }
         if(!device_comps.read_coe(&device_comps.coe,sizeof(device_comps.coe)))
@@ -981,6 +1013,7 @@ static void read_all_param(struct _DEVICE_COMPONENTS  *const this)
             {
                 device_comps.coe.press=10000;
                 device_comps.coe.temp=10000;
+                device_comps.coe.high=10000;
                 device_comps.coe.current=10000;
                 device_comps.coe.press_clr_value=0;
             }
@@ -1004,13 +1037,13 @@ static void read_all_param(struct _DEVICE_COMPONENTS  *const this)
                 memset(&device_comps.alarm_param,0,sizeof(device_comps.alarm_param));
             }
         }
-
+        
         if(!read_report_param(&device_comps.report_param,sizeof(device_comps.report_param)))
         {
-            if(device_comps.report_param.cs!=Check_Sum_5A(&device_comps.report_param, & device_comps.report_param.cs-(unsigned char *)&device_comps.report_param))
+            if(device_comps.report_param.cs!=Check_Sum_5A(&device_comps.report_param, &device_comps.report_param.cs-(unsigned char *)&device_comps.report_param))
             {
                 device_comps.report_param.min=0;
-                device_comps.report_param.hour=3;
+                device_comps.report_param.hour=0;
                  device_comps.report_param.min_Interval=1440;
                 device_comps.report_param.hour_Interval=25;
                 device_comps.report_param.disFactor=60;
@@ -1189,7 +1222,7 @@ static void pressOverloadReport(struct _DEVICE_COMPONENTS  *const this )
 }
 static void device_comps_task_handle(void)//Execution interval is 200 ms
 {
-	int i=0;
+	
 	device_comps_t *this=device_comps.this;
 	if(this->do_init==1)
 	{
@@ -1219,7 +1252,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
            
 			this->count=0;
 			get_batt();
-		 
+		   
 			this->read_all_param(this);
 			//TODO
 		}
@@ -1244,11 +1277,13 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
     		  }
     		  #endif
     		  init_once=0;
+			 
 		  }
+		
     }
 	
 	//if((this->do_init==0)&&(!loraComps.sw._bit.runing))
-	if( (this->do_init==0)&&(!netComps.St._bit.running))//&&(!loraComps.sw._bit.runing))
+	if( (this->do_init==0)&&(!netComps.St._bit.running)&&(!radComps.sw._bit.running))//&&(!loraComps.sw._bit.runing))
 	{
 	    int sample_en=0;
 		if(this->count==5)//every 1s calc press and temperature
@@ -1256,7 +1291,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
             long ad1_ad3_temp=0;
 			this->count=0;
 			
-
+            
 
 			//NTC TEMP
 			//ad1_ad3_temp=this->ad3_average_result;
@@ -1268,6 +1303,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
             //ad1_ad3_temp-=this->ad3_average_result;
 
 
+            #ifndef   MD_EXT_MEASUREMENT_MODULE
             //PT100 TEMP
             ad1_ad3_temp=this->temp_p_temp_n_average_result;
             this->temp_p_temp_n_average_result=this->calc_temp_p_temp_n_average(this);
@@ -1293,6 +1329,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 			hum_comps.dis_oper_mark._bit.refresh_temp_adc=1;
 			
 
+          
 			ad1_ad3_temp=this->high_p_high_n_average_result;
             this->high_p_high_n_average_result=this->calc_high_p_high_n_average(this);
             this->current_high_n_2=this->current_high_n_1;
@@ -1328,7 +1365,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 
             ad1_ad3_temp=this->ad1_ad2_average_result;
 			this->ad1_ad2_average_result=this->calc_ad1_ad2_average(this);
-			//this->ad1_ad2_average_result=this->ad1_convert_result[0];
+			this->ad1_ad2_average_result=this->ad1_convert_result[0];
 			ad1_ad3_temp-=this->ad1_ad2_average_result;
 			if(ad1_ad3_temp<0)
 			{
@@ -1347,12 +1384,6 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 			this->current_press_n_2=this->current_press_n_1;
 			this->current_press_n_1=this->current_press;
 			this->current_press=this->calc_current_press(this);
-			if(this->current_press>this->max_press)
-			{
-                this->max_press=this->current_press;
-                hum_comps.dis_oper_mark._bit.refresh_press_max=1;
-			}
-			pressOverloadReport(this);
 			if(this->current_press>this->calibration_param.y[3])
 			{
 				device_comps.sw._bit.over_range=1;
@@ -1363,9 +1394,15 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 			}
 		    hum_comps.dis_oper_mark._bit.refresh_press=1;
 			hum_comps.dis_oper_mark._bit.refresh_press_adc=1;
-
 			this->current_4_20ma=calc_current_4_20ma(this);
-
+			
+          #endif
+			if(this->current_press>this->max_press)
+			{
+                this->max_press=this->current_press;
+                hum_comps.dis_oper_mark._bit.refresh_press_max=1;
+			}
+            pressOverloadReport(this);
 			
             this->ad3_pos=0;
 			this->ad1_pos=0;
@@ -1384,7 +1421,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 		 }  
          else
          {
-            if(this->count==2)
+            if(this->count==2 || this->count==4)
             {
                 sample_en=1;
             }
@@ -1392,8 +1429,25 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
          }
          if(sample_en)
          {
-            MD_SET_REF_3030C_ON;
-	        delay_us(400);//400
+
+
+           #ifdef   MD_EXT_MEASUREMENT_MODULE
+             #if (MD_EXT_MEASUREMENT_MODULE_TYPE==MD_RAD)
+              radComps.start();
+             #else
+              pressComps.start();
+             #endif   
+		   #else 
+			   MD_SET_REF_3030C_ON;
+			   delay_us(400);//400
+			   cs123x_comps.restart();
+	           cs123x_comps.sw._bit.running=1;
+	           cs123x_comps.enable_interrupt();
+             
+	       #endif
+		   
+		   //             
+//	        
             
 //            cs123x_comps.restart();
 //            NOP();NOP();NOP();NOP();NOP();NOP();NOP();NOP();
@@ -1407,14 +1461,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 //            cs123x_comps.write_reg(&this->temp_p_convert_result[this->temp_p_pos++],0x70);
 //            cs123x_comps.power_down();
 
-            
-            cs123x_comps.restart();
-            cs123x_comps.sw._bit.running=1;
-            cs123x_comps.enable_interrupt();
 
-        
-       
-	       
 //        	R_ADC_Set_OperationOff();
 //	        delay_us(40);
 //	        ADM2&=~0x80;
@@ -1477,7 +1524,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 
 device_comps_t device_comps=
 {
-	"device comps",                //char *desc;
+	"",                //char *desc;
     &device_comps,     //struct _DEVICE_COMPONENTS  *const this;
     1,//   int   do_init;//Whether to initialize,1:init 0,no init
     device_comps_init,//    unsigned char (*const init)(struct _DEVICE_COMPONENTS *);
@@ -1553,13 +1600,22 @@ device_comps_t device_comps=
     save_device_coe,  
     clr_press,
 
-    {    //    struct 
-        //      {
-        //          long glng;
-        //          long glat;
-      0  //          unsigned char isLocSuc;
-        //          unsigned char cs;
-     },  //      }gps;
+    {         //     struct 
+            //    {
+            //        union 
+            //        {
+            //        	unsigned char All;
+       0     //        	struct
+            //        	{
+            //                unsigned char isLocSuc      :1;
+            //                unsigned char isActive      :1;
+            //            }_bit;
+            //        }sw;
+            //        long glng;
+            //        long glat;
+            //        unsigned char loc_times;
+            //        unsigned char cs;
+    },        //    }gps;
       read_gps_loc, //      int (*read_gps_loc)(void *,int );
       save_gps_loc,   //    int (*save_gps_loc)(void const *,int);
       get_gps_info_from_net,//int (*get_gps_info_from_net)(char const *);
@@ -1589,6 +1645,23 @@ device_comps_t device_comps=
       read_sensor_info,     //int (*read_sensor_info)(void *,int );
       save_sensor_info,     //int (*save_sensor_info)(void const *,int);
 
+
+     {           //             struct
+                //             {
+                //                 union 
+                //                 {
+                //                     unsigned char All;
+                //                     struct
+                //                     {
+                //                         unsigned char on      :1;
+                //                         unsigned char running :1;
+                //                     }_bit;
+    {0},        //                  }sw;
+     0,         //                  int timer;
+    start_buzzer,//                 void (*start)(int timer);
+    stop_buzzer, //                 void (*stop)(void);
+    },             //             }buzzer;
+    
 
  
     0,//     unsigned int batt;//batt voltage
@@ -1644,9 +1717,9 @@ device_comps_t device_comps=
     read_device_sn,
     save_device_sn,
 
-    {0},//float_level_param_t  float_level_param;
-	read_float_level_param,// int(*read_float_level_param)(void * , int);
-	save_float_level_param,//int (*save_float_level_param)(void const * , int);
+    {0},//level_param_t  level_param;
+	read_level_param,// int(*read_level_param)(void * , int);
+	save_level_param,//int (*save_level_param)(void const * , int);
 
     
     0,//int report_interval_timer;
@@ -1669,6 +1742,7 @@ void CalcReportTime(unsigned char *hur,unsigned char *min,unsigned char *sec)
 	unsigned long  DisPerTimehur=Min/60;
 	unsigned long  DisPerTimeMin=Min%60;//min
 	
+	
 	*sec=DisPerTimeTotalSecond%60;
 	*min=(device_comps.report_param.min+DisPerTimeMin)%60;
 	*hur=(device_comps.report_param.hour+DisPerTimehur+(device_comps.report_param.min+DisPerTimeMin)/60)%24;
@@ -1682,6 +1756,11 @@ void GSMReturnTimeChk(unsigned char RHur,unsigned char RMin,unsigned char RSec)
 {
 	//unsigned int cmp=device_comps.report_param.hour_Interval;
 	unsigned int cmp=device_comps.report_param.min_Interval;
+	if(!cmp)
+	{
+        device_comps.report_interval_timer=0;
+	    return ;
+	}
     if(cmp<5)
 	{
 		cmp=5;
@@ -1716,8 +1795,9 @@ void  Timing_interval_report(void)
     unsigned char ReportHur;
 	unsigned char ReportMin;
 	unsigned char ReportSec;
-	unsigned char ReportMin_30=ReportMin;
+	unsigned char ReportMin_30;
 	unsigned char temp[7];
+	
     CalcReportTime(&ReportHur,&ReportMin,&ReportSec);
     if(rtc_valve.sec == ReportSec)
 	{	
@@ -1730,13 +1810,24 @@ void  Timing_interval_report(void)
 	        {
                 if(device_comps.batt>30)
                 {
-                    protocolComps.triggerIrq._bit.timeAuto=1;
+                    if(device_comps.report_param.hour && device_comps.report_param.min )
+                    {
+                        protocolComps.triggerIrq._bit.timeAuto=1;
+                    }
                 }
+                
+	        }
+	        if(!device_comps.report_interval_timer && !device_comps.report_param.hour && !device_comps.report_param.min )
+	        {
+               if(rtc_valve.day==1 && rtc_valve.day==0x11 && rtc_valve.day==0x21)
+               {
+                    protocolComps.triggerIrq._bit.batteryBlunt=1;
+               }
 	        }
 	     }
 		GSMReturnTimeChk(ReportHur,ReportMin,ReportSec); //检查上报时间，如果到达指定上报时间，则系统开始上报数据//	
 
-        ReportMin_30+=0x30;
+        ReportMin_30=ReportMin+0x30;
         if(ReportMin_30>=0x60)
         {
             ReportMin_30-=0x60;
@@ -1798,13 +1889,8 @@ void _0_5s_task_handle(void)
     			ircComps.op_window_time--;
     			if(ircComps.op_window_time==0)
     			{
-    				ircComps.sw._bit.runing=0;
-
-    				#ifndef MD_MODBUS
-        				disable_irc_receive();
-        				disable_irc_send();
-    				#endif
-    				MD_IR_VCM_OFF; 
+    				ircComps.stop();
+    				
     			}
     		}
     		
@@ -1879,21 +1965,76 @@ void _0_5s_task_handle(void)
                 Timing_interval_report();
             }
         #endif
-            if(rtc_valve.min==0x21&&rtc_valve.sec==0x21)
+            if(rtc_valve.hour==0x21&&rtc_valve.min==0x21&&rtc_valve.sec==0x21)
             {
                  //save systemtime();
+				 device_comps.gps.sw._bit.isActive=1;
             }
             hum_comps.dis_oper_mark._bit.refresh_time=1;
             hum_comps.dis_oper_mark._bit.refresh_date=1; 
+
+
+            if(radComps.op_window_time>0)
+            {
+                radComps.op_window_time--;
+                if(!radComps.op_window_time)
+                {
+                    radComps.stop();
+					device_comps.high_calibration_param.is_calibrated=0;
+                   // R_TAU0_Channel1_Stop();
+                }
+                
+            }
 
             
             device_comps._0_5s_timr_acc=0;
     	}
 
-      
+      /////////////////////////////////
         if(netComps.AckTmr>0)
         {
             netComps.AckTmr--;
         }
+
+       
     }
 }
+
+void _50ms_task_handle(void)
+{
+    if(pressComps.op_window_time>0)
+    {
+        if(pressComps.op_window_time==3)//delay time=timer-20
+        {
+            MD_IR_VCM_ON;
+		}
+		if(pressComps.op_window_time==2)//delay time=timer-20
+        {
+           pressComps.write(0x901f);
+        }
+        pressComps.op_window_time--;
+        if(!pressComps.op_window_time)
+        {
+            pressComps.stop();
+            device_comps.calibration_param.is_calibrated=0;
+        }
+     }
+     
+    if(device_comps.buzzer.timer>0)
+    {
+       if(device_comps.buzzer.sw._bit.on)
+       {
+           R_PCLBUZ0_Start();
+           P0 &= 0xFBU;
+           PM0 &= 0xFBU;
+           device_comps.buzzer.sw._bit.on=0;
+       }
+       device_comps.buzzer.timer--;
+       if(!device_comps.buzzer.timer)
+       {
+            device_comps.buzzer.stop();
+       }
+    }
+     
+}
+

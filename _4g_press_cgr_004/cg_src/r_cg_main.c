@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements main function.
-* Creation Date: 2020/12/30 星期三
+* Creation Date: 2021/6/18 星期�?
 ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
@@ -35,6 +35,7 @@ Includes
 #include "r_cg_tau.h"
 #include "r_cg_rtc.h"
 #include "r_cg_it.h"
+#include "r_cg_pclbuz.h"
 #include "r_cg_wdt.h"
 #include "r_cg_adc.h"
 #include "r_cg_sau.h"
@@ -70,7 +71,6 @@ void R_MAIN_UserInit(void);
 void main(void)
 {
     R_MAIN_UserInit();
-	//RPERDIS=1;
     /* Start user code. Do not edit comment generated here */
     systemComps.user_init();
     do
@@ -89,6 +89,7 @@ void main(void)
 void R_MAIN_UserInit(void)
 {
     /* Start user code. Do not edit comment generated here */
+    device_comps.buzzer.stop();
     R_CGC_Get_ResetSource();
 	
     #ifndef MD_NO_LCD
@@ -99,6 +100,7 @@ void R_MAIN_UserInit(void)
     R_IT_Start();
     R_LCD_Start();
     R_RTC_Start();
+    
     EI();
     /* End user code. Do not edit comment generated here */
 }

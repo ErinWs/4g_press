@@ -23,7 +23,7 @@
 * Device(s)    : R7F0C004M
 * Tool-Chain   : CCRL
 * Description  : This file implements device driver for CGC module.
-* Creation Date: 2020/12/30 星期三
+* Creation Date: 2021/6/18 星期五
 ***********************************************************************************************************************/
 #ifndef CGC_H
 #define CGC_H

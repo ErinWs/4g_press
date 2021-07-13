@@ -23,12 +23,35 @@
 #define   MD_USE_RTC_MODULE
 
 
+//#define   MD_EXT_MEASUREMENT_MODULE
+#define   MD_RAD         0
+#define   MD_PRESS       1
+#define   MD_EXT_MEASUREMENT_MODULE_TYPE   MD_PRESS
+
+
+#define  APP_PROTOCOL_ZHIAN            0
+#define  APP_PROTOCOL_SELF             1
+#define  APP_PROTOCOL_TYPE             APP_PROTOCOL_SELF
+
+#if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN)
+#define  MD_PUSH_DATA_TO_IP1
+#else
+#define  MD_ALT_IP
+#endif
+
+
+
 #define   MD_CH0_GAIN    (3<<2)
 #define   MD_CH1_GAIN    (3<<2)
 
 
 #define   MD_E2PROM_DRIVER_ERR           (1<<0)
+
+#ifndef   MD_EXT_MEASUREMENT_MODULE
 #define   MD_CS123X_DRIVER_ERR           (1<<1)
+#else
+#define   MD_CS123X_DRIVER_ERR           (0<<1)
+#endif
 
 #if(MD_PRODUCT_NAME==MD_LORA)
 #define   MD_LORA_MODULE_ERR             (1<<2)
@@ -48,13 +71,13 @@
 #define   MD_SET_REF_3030C_ON       P1_bit.no6=1
 #define   MD_SET_REF_3030C_OFF      P1_bit.no6=0
 
-#define   MD_SET_BAT_CTL_ON         P4_bit.no5=1
-#define   MD_SET_BAT_CTL_OFF        P4_bit.no5=0
+#define   MD_SET_BAT_CTL_ON         P4_bit.no4=1
+#define   MD_SET_BAT_CTL_OFF        P4_bit.no4=0
 
 
 
 #define MD_MEMORY_TEST_START_ADDR                      0x0000   //
-#define MD_FLOAT_LEVEL_PARAM_START_ADDR                0x0020 
+ 
 
 #define MD_CALIBRATION_PARAM_START_ADDR                0x0030   //64bytes
 #define MD_RES_CALIBRATION_PARAM_START_ADDR            0x0070   //64bytes
@@ -84,6 +107,7 @@
 #define MD_MANUFACTURER_INFO_START_ADDR                0x0620
 #define MD_DEVICE_INFO_START_ADDR                      0x0640
 #define MD_SENSOR_INFO_START_ADDR                      0x0680
+#define MD_LEVEL_PARAM_START_ADDR                      0x06c0
 
 
 
@@ -151,9 +175,17 @@ typedef enum
 typedef struct
 {
     long bottom_s;
+    long sample_interval_value;
+    long total_high_mm;
+    long offset_mm;
+    long coe;
+    long _4ma_lower_range;
+    long _4ma_high_range;
+    long _4ma_dir;
     unsigned char cs;
+    
 }
-float_level_param_t;
+level_param_t;
 
   typedef struct
   {
@@ -200,23 +232,23 @@ float_level_param_t;
    device_sn_t;
 
                         
-  typedef struct
-  {
-         union 
-        {
-        	unsigned char All;
-        	struct
-        	{
-                 unsigned char test_finished      :1;
-                 unsigned char count_en		    :1;
-                 unsigned char isWarn		        :1;
-            }_bit;
-        }sw;
-        long  ref_press;
-        long  press_set_format_valve;
-        int   delay_timer;
-        int   timer;
-   }_4g_t;
+//  typedef struct
+//  {
+//         union 
+//        {
+//        	unsigned char All;
+//        	struct
+//        	{
+//                 unsigned char test_finished      :1;
+//                 unsigned char count_en		    :1;
+//                 unsigned char isWarn		        :1;
+//            }_bit;
+//        }sw;
+//        long  ref_press;
+//        long  press_set_format_valve;
+//        int   delay_timer;
+//        int   timer;
+//   }_4g_t;
 
 
 
@@ -237,7 +269,7 @@ float_level_param_t;
 typedef struct
 {
     int  store_addr;
-    char lastSampleTime[7];
+    unsigned char lastSampleTime[7];
     unsigned char cs;
 }
 TimeSegData_t;
@@ -342,6 +374,7 @@ typedef struct _DEVICE_COMPONENTS
     {
         int press;
         int temp;
+        int high;
         long press_clr_value;
         int  current;
         unsigned char cs;
@@ -352,10 +385,18 @@ typedef struct _DEVICE_COMPONENTS
 
     struct 
     {
+        union 
+        {
+        	unsigned char All;
+        	struct
+        	{
+                unsigned char isLocSuc      :1;
+                unsigned char isActive      :1;
+            }_bit;
+        }sw;
         long glng;
         long glat;
-        unsigned char isLocSuc;
-        unsigned char isActive;
+        unsigned char loc_times;
         unsigned char cs;
     }gps;
     int (*read_gps_loc)(void *,int );
@@ -385,6 +426,22 @@ typedef struct _DEVICE_COMPONENTS
     }sensor_info;
     int (*read_sensor_info)(void *,int );
     int (*save_sensor_info)(void const *,int);
+
+    struct
+    {
+        union 
+        {
+        	unsigned char All;
+        	struct
+        	{
+                unsigned char on      :1;
+                unsigned char running :1;
+            }_bit;
+        }sw;
+        int timer;
+        void (*start)(int timer);
+        void (*stop)(void);
+    }buzzer;
   
     unsigned char batt;//batt voltage
 	calibration_param_t calibration_param;
@@ -437,9 +494,9 @@ typedef struct _DEVICE_COMPONENTS
 	int (*read_device_sn)(void * , int);
 	int (*save_device_sn)(void const * , int);
 
-	float_level_param_t  float_level_param;
-	int (*read_float_level_param)(void * , int);
-	int (*save_float_level_param)(void const * , int);
+	level_param_t  level_param;
+	int (*read_level_param)(void * , int);
+	int (*save_level_param)(void const * , int);
 
 	
 	
@@ -449,14 +506,14 @@ typedef struct _DEVICE_COMPONENTS
 
 	void (*read_all_param)(struct _DEVICE_COMPONENTS  *const);
     
-	void  ( *const output_debug_info)(struct _DEVICE_COMPONENTS   *const);//point to sensor_comps_output_debug_info(device_comps_t const *const this)
+	void  ( *const output_debug_info)(struct _DEVICE_COMPONENTS const  *const);//point to sensor_comps_output_debug_info(device_comps_t const *const this)
 	char debug_info[32];
 	void  ( *const task_handle)(void);//point to device_comps_task_handle
 }device_comps_t; 
 
 extern device_comps_t device_comps;
 void _0_5s_task_handle(void);
-
+void _50ms_task_handle(void);
 
 
 #endif

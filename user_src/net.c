@@ -9,9 +9,9 @@
 #include "math.h"
 #include "stdlib.h"
 #include "stdio.h"
+#include "irc.h"
 
-//#define  MD_PUSH_DATA_TO_IP1
-#define  MD_ALT_IP
+
 
 
 #define GSMPWRCTL_pin	P1_bit.no2
@@ -68,7 +68,7 @@ static struct
 	
 	
     char          pdp_id;
-    unsigned char NoRegestPSENetCount;;
+    unsigned char NoRegestPSENetCount;
     unsigned char  NoRegestCSNetCount;
 	unsigned char  NoGetGpsLocCount;
 	
@@ -123,28 +123,28 @@ static void init_ENV_net_device(void)
     netComps.disCode=EM_DIS_ACT;
 }
     
-static void cold_start_net_device()	
+static void cold_start_net_device(void)	
 {
     netMisc.Flag_St = 0;
     netMisc.Reset_St=0;//turn on moudle //
     init_ENV_net_device();
 }  
    
-static void hot_start_net_device()	
+static void hot_start_net_device(void)	
 {
     netMisc.Flag_St = 0;
     netMisc.Reset_St=2;//
     init_ENV_net_device();
 }    
 
-static void stop_net_device()
+static void stop_net_device(void)
 {
     netMisc.Flag_St = 1;
     netMisc.TurnOFF_St=0;//turn on moudle //
     netMisc.AT_Waiting=0;
 }
 
-static void on_net_device_ack_ok()
+static void on_net_device_ack_ok(void)
 {
        netMisc.AT_Waiting=0;
        netMisc.NoAckTimes=0;
@@ -230,7 +230,7 @@ static void DealAnalyticCode(int err)//err=0;err£¬err=1,recv ok £¬err=3,no data
 //
 //}
 
-static void HandleNoAck()
+static void HandleNoAck(void)
 {
 	if(netMisc.NoAckTimes<1)
 	{
@@ -245,7 +245,7 @@ static void HandleNoAck()
 }
 
 
-static void   HandleErr()
+static void   HandleErr(void)
 {
     
     if(netMisc.err_count<1)
@@ -379,7 +379,7 @@ static void check_ip_switch(void)
     #endif  
 }
 
-static void HandleDataErrIP()
+static void HandleDataErrIP(void)
 {
     if(netMisc.err_count<1)
     {
@@ -393,7 +393,7 @@ static void HandleDataErrIP()
 
 }
 
-static void   HandleRegTimeOut()
+static void   HandleRegTimeOut(void)
 {
     if(netMisc.reStartTimes>0)
     {
@@ -412,10 +412,10 @@ static void TX_ATData(unsigned char  *ptr,unsigned int WaitingTime)
 {
     netComps.AckTmr = WaitingTime;
 	netMisc.AT_Waiting = 1;
-	netMisc.write(ptr,strlen(ptr));
+	netMisc.write(ptr,strlen((char *)ptr));
 }
 
-static void TX_ATCommand(unsigned char  *ptr,unsigned short WaitingTime)
+static void TX_ATCommand(char  *ptr,unsigned short WaitingTime)
 {
 	unsigned char TxLen = 0;
     while(*ptr!='\0')
@@ -428,14 +428,14 @@ static void TX_ATCommand(unsigned char  *ptr,unsigned short WaitingTime)
 	netMisc.write(&netMisc.TX_ATCombuffer[0], TxLen);
 }
 
-static unsigned char * check_net_device_ack(unsigned char *FindStr)  
+static unsigned char * check_net_device_ack(char const *FindStr)  
 {
     char FindstrLen;
     char *StartPt,*EndPt;
     void *rslt=(void *)0;
     FindstrLen =(char) strlen((char *)FindStr);
-    StartPt = &netComps.recv_base_pt[0];
-    EndPt = netComps.recv_RxSt;
+    StartPt = (char *)&netComps.recv_base_pt[0];
+    EndPt =(char *) netComps.recv_RxSt;
     while(EndPt-StartPt>=FindstrLen)
     {
     	if(!memcmp(FindStr,StartPt,FindstrLen))
@@ -659,19 +659,19 @@ unsigned char PacketCoapMsg(unsigned char const *buf,int len)
     return ret;
 }              
 
-static void GetHexMsg(unsigned char *des,unsigned char const*src,unsigned int Length)
-{
-	HexSrtToHex(des,src,Length);
-}
+//static void GetHexMsg(unsigned char *des,unsigned char const*src,unsigned int Length)
+//{
+//	//HexSrtToHex(des,src,Length);
+//}
 
 static unsigned char GetMsg(unsigned char const *buf,int len)
 {
 	unsigned char err=0;
-	unsigned int Len= 0;
+	
 	memset(netMisc.recv_msg_buf,0,sizeof(netMisc.recv_msg_buf));	
 	//GetHexMsg(netMisc.recv_msg_buf,buf,len);
 	memcpy(netMisc.recv_msg_buf,buf,len);
-	netComps.msg;//=netMisc.recv_msg_buf;
+//	netComps.msg;//=netMisc.recv_msg_buf;
 	netComps.msgLen=len;
 	netComps.St._bit.recvData=1;
 	err=1;
@@ -736,7 +736,7 @@ static void reset_net_device(void)
 
 void power_down_net_deivice(void)
 {   
-     char msg[32]="";
+    
      switch(netMisc.TurnOFF_St)
      { 
           case 0: 
@@ -840,8 +840,8 @@ static void GetRssi(void)
 	      if(pt_rssi=check_net_device_ack("+CSQ: "))
 	      {
                 char *ptsz;
-                netComps.net_info.Csq=strtol(pt_rssi,&ptsz,10);
-                netComps.net_info.CsQ=strtol(ptsz+1,&ptsz,10);
+                netComps.net_info.Csq=strtol((char *)pt_rssi,&ptsz,10);
+                netComps.net_info.CsQ=strtol((char *)ptsz+1,&ptsz,10);
     	  }
 	      on_net_device_ack_ok(); 
 	}  
@@ -924,7 +924,7 @@ static void Srv_GSM(void)
 {     
     unsigned char *pt_rssi;
     unsigned char i;
-    unsigned char msg[64]="";
+   
 	
 	switch(netMisc.Flag_St)
 	{
@@ -962,15 +962,20 @@ static void Srv_GSM(void)
 			}
 			else if(check_net_device_ack("OK\r\n"))
 			{
-			     if(device_comps.gps.isActive)
+                #if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN)        
+			     if(device_comps.gps.sw._bit.isActive)
 				 {
-                    device_comps.gps.isActive=0;
+                    device_comps.gps.sw._bit.isActive=0;
                     net_status_sjmp_any_step(5);
 				 }
 				 else
 				 {
                      net_status_sjmp_any_step(12);
 				 }
+				#else
+				 net_status_sjmp_any_step(12);
+				#endif
+				
 			}	
 			break;
 
@@ -1007,7 +1012,7 @@ static void Srv_GSM(void)
     		{
     			 on_net_device_ack_ok();
 				 netMisc.NoGetGpsLocCount=0;
-    			 device_comps.gps.isLocSuc=0;
+    			 device_comps.gps.sw._bit.isLocSuc=0;
     			 netComps.disCode=EM_DIS_GPS_STATUS;
     		}	
     		break;
@@ -1075,7 +1080,7 @@ static void Srv_GSM(void)
                       else
                       {
                             
-                           device_comps.gps.isLocSuc=1;
+                           device_comps.gps.sw._bit.isLocSuc=1;
                            on_net_device_ack_ok();
                            netComps.op_window_tmr=150;
                           
@@ -1325,7 +1330,7 @@ static void Srv_GSM(void)
 			}
 			else if(!netComps.AckTmr)
 			{
-				HandleNoAck(0);
+				HandleNoAck();
             } 
 			else if(check_net_device_ack("OK\r\n"))
 			{
@@ -1356,7 +1361,7 @@ static void Srv_GSM(void)
 			}
 			else if(!netComps.AckTmr)
 			{
-				HandleNoAck(0);
+				HandleNoAck();
             } 
 			else if(check_net_device_ack("OK\r\n"))
 			{
@@ -1441,7 +1446,7 @@ static void Srv_GSM(void)
     					 {
     						unsigned char Tbuf[8]=""; 
     					    unsigned char i=0;
-    						unsigned char TimeZoneEn=0;
+    						//unsigned char TimeZoneEn=0;
     						for(i=0;i<6;i++)
     						{
     							Tbuf[i]=((*(pt_rssi+3*i)-0x30)*10)+(*(pt_rssi+3*i+1)-0x30);
@@ -1457,19 +1462,22 @@ static void Srv_GSM(void)
     							if((Tbuf[0]>0x16)&&(Tbuf[0]<0x50)&&(Tbuf[1]<0x13)&&(Tbuf[1]>0x00)&&(Tbuf[2]<0x32)&&
     							 (Tbuf[2]>0x00)&&(Tbuf[3]<0x24)&&(Tbuf[4]<0x60)&&(Tbuf[5]<0x60))
     							{
-    								rtc_valve.year=Tbuf[0];
-    								rtc_valve.month=Tbuf[1];
-    								rtc_valve.day=Tbuf[2];
-    								rtc_valve.hour=Tbuf[3];
-    								rtc_valve.min=Tbuf[4];
-    								rtc_valve.sec=Tbuf[5];
-							        R_RTC_Set_CounterValue(rtc_valve);	
-    							}
+    								device_comps.system_time.year=rtc_valve.year=Tbuf[0];
+    								device_comps.system_time.month=rtc_valve.month=Tbuf[1];
+    								device_comps.system_time.day=rtc_valve.day=Tbuf[2];
+    								device_comps.system_time.hour=rtc_valve.hour=Tbuf[3];
+    								device_comps.system_time.min=rtc_valve.min=Tbuf[4];
+    								device_comps.system_time.sec=rtc_valve.sec=Tbuf[5];
+
+                                    device_comps.system_time.cs=Check_Sum_5A(&device_comps.system_time, &device_comps.system_time.cs-(unsigned char *)&device_comps.system_time);
+                                    device_comps.save_system_time(&device_comps.system_time,sizeof(device_comps.system_time));
+                                    R_RTC_Set_CounterValue(rtc_valve);	//ÉèÖÃÊ±¼ä//
+                                }
     						}
     					}
     					on_net_device_ack_ok();
     			    }
-			    break;
+			        break;
          case 23:  
             if(!netMisc.AT_Waiting)
 			{
@@ -1620,10 +1628,10 @@ static void Srv_GSM(void)
     			}
     			else if(pt_rssi=check_net_device_ack("+QIURC: \"dnsgip\",\""))
     			{
-                    if(strstr(pt_rssi,"\r\n"))
+                    if(strstr((char *)pt_rssi,"\r\n"))
                     {
                          char *ptsz;
-                         netComps.net_info.ResolvedIP[0]=strtol(pt_rssi,&ptsz,10);
+                         netComps.net_info.ResolvedIP[0]=strtol((char *)pt_rssi,&ptsz,10);
                          netComps.net_info.ResolvedIP[1]=strtol(ptsz+1,&ptsz,10);
                          netComps.net_info.ResolvedIP[2]=strtol(ptsz+1,&ptsz,10);
                          netComps.net_info.ResolvedIP[3]=strtol(ptsz+1,&ptsz,10);
@@ -1832,8 +1840,8 @@ static void Srv_GSM(void)
     		        char *ptsz;
                     long noAckBytes;
                     static int query_times=0;
-                    strtol(pt_rssi,&ptsz,10);
-                    strtol(ptsz+1, &ptsz,10);
+                    strtol((char *)pt_rssi,&ptsz,10);
+                    strtol((char *)ptsz+1, &ptsz,10);
                     noAckBytes=strtol(ptsz+1, &ptsz,10);
                     if(!noAckBytes)
                     {
@@ -1852,7 +1860,7 @@ static void Srv_GSM(void)
                         }
                         else
                         {
-                            net_status_sjmp_any_step(29);//close socket
+                            net_status_sjmp_any_step(29);//close socket retry
                             query_times=0;
                         }
                         
@@ -1904,7 +1912,7 @@ static void Srv_GSM(void)
 	            if(pt_rssi=check_net_device_ack("+QIRD: "))
 				{
                     
-                    Length=atoi(pt_rssi);
+                    Length=atoi((char *)pt_rssi);
                     if((Length<1)||(Length>512))
                     {
                     	netMisc.ErrCode=0;
@@ -1984,6 +1992,9 @@ void net_task_handle(void)
         netComps.op_window_tmr = MD_MODULE_OP_MAX_TIME;	//5¡¤??¨®//
         netComps.St._bit.on=0;
         netComps.disCode=EM_DIS_ACT;
+        device_comps.report_param.triggerTimes++;
+		device_comps.report_param.cs=Check_Sum_5A((unsigned char *)&device_comps.report_param, &device_comps.report_param.cs-(unsigned char *)&device_comps.report_param);
+		device_comps.save_report_param(&device_comps.report_param,sizeof(device_comps.report_param));
 		enter_report_mode();
        
 	}
@@ -2016,7 +2027,7 @@ netComps_t netComps=
 {
 	{0},//st
 	EM_DIS_ACT,
-	&netMisc.recv_msg_buf,//unsigned char *const msg;//Passed to the protocol layer point
+	(unsigned char *)&netMisc.recv_msg_buf,//unsigned char *const msg;//Passed to the protocol layer point
 	0,//unsigned int   msglen;
 	netMisc.recv_buf,//igned char *const recv_base_pt;//Passed to uart recv  point
    &netMisc.recv_Idx,//
