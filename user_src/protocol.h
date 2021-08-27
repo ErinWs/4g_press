@@ -5,7 +5,7 @@ typedef struct
 {
 	union 
     {
-    	uint8_t All;
+    	uint16_t All;
     	struct
     	{
     		
@@ -17,6 +17,10 @@ typedef struct
     		uint8_t timeAuto 		:1;
     		uint8_t intervalTime    :1;
     		uint8_t batteryBlunt    :1;
+    		uint8_t THighOver       :1;
+    		uint8_t TLowLess        :1;
+    		
+    		
     	}_bit;
     }triggerIrq;
     union

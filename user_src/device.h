@@ -31,7 +31,10 @@
 
 #define  APP_PROTOCOL_ZHIAN            0
 #define  APP_PROTOCOL_SELF             1
-#define  APP_PROTOCOL_TYPE             APP_PROTOCOL_SELF
+#define  APP_PROTOCOL_SHENGHUO         2
+#define  APP_PROTOCOL_SIDI_INFO        3
+
+#define  APP_PROTOCOL_TYPE             APP_PROTOCOL_SIDI_INFO
 
 #if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN)
 #define  MD_PUSH_DATA_TO_IP1
@@ -201,6 +204,17 @@ level_param_t;
 
   typedef struct 
   {
+      union 
+      {
+     	unsigned int All;
+     	struct
+     	{
+              unsigned char high_temp_alarm_en     :1;
+              unsigned char low_temp_alarm_en		:1;
+              unsigned char high_press_alarm_en	:1;
+              unsigned char low_press_alarm_en	    :1;
+         }_bit;
+      }sw;
       long press_high_upper;
       long press_high_lower;
       long press_low_upper;
@@ -209,6 +223,7 @@ level_param_t;
 
       int temp_high;
       int temp_low;
+      
       unsigned char cs;
   }
   alarm_param_t;
@@ -298,6 +313,7 @@ typedef struct _DEVICE_COMPONENTS
 				unsigned char res		            			:1;
                 
                 unsigned char temp_adc_stb	                    :1;
+                unsigned char isPressNoConnect	                :1;
                 unsigned char isPLowRealseTriggered             :1;
                 unsigned char isPLowLessTriggered               :1;
                 unsigned char isPHighRealseTriggered            :1;
@@ -309,6 +325,17 @@ typedef struct _DEVICE_COMPONENTS
                 unsigned char high_adc_stb	                    :1;
                 unsigned char batt_status                       :1;
                 unsigned char data_mode                         :1;
+                unsigned char isOnline                          :1;
+
+                unsigned char isTempNoConnect	                :1;
+                unsigned char isTHighOverTriggered	            :1;
+                unsigned char isTHighRealseTriggered	         :1;
+                unsigned char isTLowLessTriggered                :1;
+                unsigned char isTLowRealseTriggered              :1;
+                
+
+
+                
 
     	}_bit;
     }sw;
@@ -316,6 +343,10 @@ typedef struct _DEVICE_COMPONENTS
     int PHihgRealseTimer;
     int PLowLessTimer;
     int PLowRealseTimer;
+    int THihgOverTimer;
+    int THihgRealseTimer;
+    int TLowLessTimer;
+    int TLowRealseTimer;
 	
 	long  ad1_convert_result[MD_ADC_MAX_POS];
 	unsigned int  ad1_pos;

@@ -506,12 +506,16 @@ static int calc_pt_temp(device_comps_t  *const this)
 
     if (this->pt_valve <pt100_tab[0])                // 电阻值小于表格最值低于量程下限。
     {
-         return -600;
+     this->sw._bit.isTempNoConnect=1;    
+	 return -600;
+         
     }
     if (this->pt_valve >pt100_tab[limit])        // 电阻值大于表格最大值，超出量程上限 。
     {
-        return 5990;
+         this->sw._bit.isTempNoConnect=1;
+		return 5990;
     }
+	this->sw._bit.isTempNoConnect=0;
     cBottom = 0; 
     cTop    = limit;
      for (i=limit/2; (cTop-cBottom)!=1; )        // 2分法查表。
@@ -1118,101 +1122,111 @@ static void pressOverloadReport(struct _DEVICE_COMPONENTS  *const this )
     long temp=0;
     if((this->calibration_param.unit&0x0f)==this->alarm_param.unit)
     {
-        if(this->alarm_param.press_high_lower>0)
+       #if(APP_PROTOCOL_TYPE==APP_PROTOCOL_SHENGHUO)
+        if(this->alarm_param.sw._bit.high_press_alarm_en)
+       #endif
         {
-            temp=formatData4fixDot(this->current_press,device_comps.calibration_param.dot);
-            if(temp>this->alarm_param.press_high_lower)
+            if(this->alarm_param.press_high_lower>0)
             {
-                this->PHihgOverTimer++;
-                this->PHihgRealseTimer=0;
-                if( this->PHihgOverTimer>=40)
+                temp=formatData4fixDot(this->current_press,device_comps.calibration_param.dot);
+                if(temp>this->alarm_param.press_high_lower)
                 {
-                    if(!this->sw._bit.isPHighOverTriggered)
-                    {
-                        if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
-            	        {
-                            if(device_comps.batt>30)
-                            {
-                                protocolComps.triggerIrq._bit.PHighOver=1;
-                                
-                            }
-            	        }
-            	        this->sw._bit.isPHighRealseTriggered=0;
-                        this->sw._bit.isPHighOverTriggered=1;
-                    }
-                    this->PHihgOverTimer=0;
-                }
-            }
-            else if((temp<this->alarm_param.press_high_lower-this->alarm_param.press_high_lower/10)&&(this->sw._bit.isPHighOverTriggered))//dealt 10%
-            {
-                this->PHihgOverTimer=0;
-                this->PHihgRealseTimer++;
-                if( this->PHihgRealseTimer>=40)
-                {
-                    if(!this->sw._bit.isPHighRealseTriggered)
-                    {
-                        if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
-            	        {
-                            if(device_comps.batt>30)
-                            {
-                              protocolComps.triggerIrq._bit.PHighRealse=1;
-                               
-                            }
-            	        }
-            	        this->sw._bit.isPHighRealseTriggered=1;
-                        this->sw._bit.isPHighOverTriggered=0;
-                    }
-                   
+                    this->PHihgOverTimer++;
                     this->PHihgRealseTimer=0;
+                    if( this->PHihgOverTimer>=40-30)
+                    {
+                        if(!this->sw._bit.isPHighOverTriggered)
+                        {
+                            if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+                	        {
+                                if(device_comps.batt>30)
+                                {
+                                    protocolComps.triggerIrq._bit.PHighOver=1;
+                                    
+                                }
+                	        }
+                	        this->sw._bit.isPHighRealseTriggered=0;
+                            this->sw._bit.isPHighOverTriggered=1;
+                        }
+                        this->PHihgOverTimer=0;
+                    }
+                }
+                else if((temp<this->alarm_param.press_high_lower-this->alarm_param.press_high_lower/10)&&(this->sw._bit.isPHighOverTriggered))//dealt 10%
+                {
+                    this->PHihgOverTimer=0;
+                    this->PHihgRealseTimer++;
+                    if( this->PHihgRealseTimer>=40-30)
+                    {
+                        if(!this->sw._bit.isPHighRealseTriggered)
+                        {
+                            if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+                	        {
+                                if(device_comps.batt>30)
+                                {
+                                  protocolComps.triggerIrq._bit.PHighRealse=1;
+                                   
+                                }
+                	        }
+                	        this->sw._bit.isPHighRealseTriggered=1;
+                            this->sw._bit.isPHighOverTriggered=0;
+                        }
+                       
+                        this->PHihgRealseTimer=0;
+                    }
                 }
             }
-        }
-
-       if(this->alarm_param.press_low_upper>0)
-       {
-           temp=formatData4fixDot(this->current_press,device_comps.calibration_param.dot);
-           if(temp<this->alarm_param.press_low_upper)
+       }
+       
+      #if(APP_PROTOCOL_TYPE==APP_PROTOCOL_SHENGHUO)
+       if(this->alarm_param.sw._bit.low_press_alarm_en)
+      #endif
+        {
+           if(this->alarm_param.press_low_upper>0)
            {
-               this->PLowLessTimer++;
-               this->PLowRealseTimer=0;
-               if( this->PLowLessTimer>=40)
+               temp=formatData4fixDot(this->current_press,device_comps.calibration_param.dot);
+               if(temp<this->alarm_param.press_low_upper)
                {
-                   if(!this->sw._bit.isPLowLessTriggered)
-                   {
-                       if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
-                       {
-                           if(device_comps.batt>30)
-                           {
-                               protocolComps.triggerIrq._bit.PLowLess=1;
-                               
-                           }
-                       }
-                       this->sw._bit.isPLowRealseTriggered=0;
-                       this->sw._bit.isPLowLessTriggered=1;
-                   }
-                   this->PLowLessTimer=0;
-               }
-           }
-           else if((temp>this->alarm_param.press_low_upper+this->alarm_param.press_low_upper/10)&&(this->sw._bit.isPLowLessTriggered))//dealt 10%
-           {
-               this->PLowLessTimer=0;
-               this->PLowRealseTimer++;
-               if(this->PLowRealseTimer>=40)
-               {
-                   if(!this->sw._bit.isPLowRealseTriggered)
-                   {
-                       if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
-                       {
-                           if(device_comps.batt>30)
-                           {
-                              protocolComps.triggerIrq._bit.PLowRealse=1;
-                              
-                           }
-                       }
-                        this->sw._bit.isPLowRealseTriggered=1;
-                        this->sw._bit.isPLowLessTriggered=0;
-                   }
+                   this->PLowLessTimer++;
                    this->PLowRealseTimer=0;
+                   if( this->PLowLessTimer>=40-30)
+                   {
+                       if(!this->sw._bit.isPLowLessTriggered)
+                       {
+                           if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+                           {
+                               if(device_comps.batt>30)
+                               {
+                                   protocolComps.triggerIrq._bit.PLowLess=1;
+                                   
+                               }
+                           }
+                           this->sw._bit.isPLowRealseTriggered=0;
+                           this->sw._bit.isPLowLessTriggered=1;
+                       }
+                       this->PLowLessTimer=0;
+                   }
+               }
+               else if((temp>this->alarm_param.press_low_upper+this->alarm_param.press_low_upper/10)&&(this->sw._bit.isPLowLessTriggered))//dealt 10%
+               {
+                   this->PLowLessTimer=0;
+                   this->PLowRealseTimer++;
+                   if(this->PLowRealseTimer>=40-30)
+                   {
+                       if(!this->sw._bit.isPLowRealseTriggered)
+                       {
+                           if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+                           {
+                               if(device_comps.batt>30)
+                               {
+                                  protocolComps.triggerIrq._bit.PLowRealse=1;
+                                  
+                               }
+                           }
+                            this->sw._bit.isPLowRealseTriggered=1;
+                            this->sw._bit.isPLowLessTriggered=0;
+                       }
+                       this->PLowRealseTimer=0;
+                   }
                }
            }
        }
@@ -1220,6 +1234,109 @@ static void pressOverloadReport(struct _DEVICE_COMPONENTS  *const this )
    }
 
 }
+
+static void tempOverloadReport(struct _DEVICE_COMPONENTS  *const this )
+{
+    long temp=0;
+    temp=this->current_temp;
+    if(this->alarm_param.sw._bit.high_temp_alarm_en)
+    {
+        if(temp>this->alarm_param.temp_high)
+        {
+            this->THihgOverTimer++;
+            this->THihgRealseTimer=0;
+            if( this->THihgOverTimer>=40-30)
+            {
+                if(!this->sw._bit.isTHighOverTriggered)
+                {
+                    if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+        	        {
+                        if(device_comps.batt>30)
+                        {
+                            protocolComps.triggerIrq._bit.THighOver=1;
+                            
+                        }
+        	        }
+        	        this->sw._bit.isTHighRealseTriggered=0;
+                    this->sw._bit.isTHighOverTriggered=1;
+                }
+                this->THihgOverTimer=0;
+            }
+        }
+        else if((temp<this->alarm_param.temp_high-this->alarm_param.temp_high/10)&&(this->sw._bit.isTHighOverTriggered))//dealt 10%
+        {
+            this->THihgOverTimer=0;
+            this->THihgRealseTimer++;
+            if( this->THihgRealseTimer>=40-30)
+            {
+                if(!this->sw._bit.isTHighRealseTriggered)
+                {
+                    if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+        	        {
+                        if(device_comps.batt>30)
+                        {
+                         // protocolComps.triggerIrq._bit.THighRealse=1;
+                           
+                        }
+        	        }
+        	        this->sw._bit.isTHighRealseTriggered=1;
+                    this->sw._bit.isTHighOverTriggered=0;
+                }
+               
+                this->THihgRealseTimer=0;
+            }
+       }
+   }
+
+   if(this->alarm_param.sw._bit.low_temp_alarm_en)
+   {
+       if(temp<this->alarm_param.temp_low)
+       {
+           this->TLowLessTimer++;
+           this->TLowRealseTimer=0;
+           if( this->TLowLessTimer>=40-30)
+           {
+               if(!this->sw._bit.isTLowLessTriggered)
+               {
+                   if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+                   {
+                       if(device_comps.batt>30)
+                       {
+                           protocolComps.triggerIrq._bit.TLowLess=1;
+                           
+                       }
+                   }
+                   this->sw._bit.isTLowRealseTriggered=0;
+                   this->sw._bit.isTLowLessTriggered=1;
+               }
+               this->TLowLessTimer=0;
+           }
+       }
+       else if((temp>this->alarm_param.temp_low+this->alarm_param.temp_low/10)&&(this->sw._bit.isTLowLessTriggered))//dealt 10%
+       {
+           this->TLowLessTimer=0;
+           this->TLowRealseTimer++;
+           if(this->TLowRealseTimer>=40-30)
+           {
+               if(!this->sw._bit.isTLowRealseTriggered)
+               {
+                   if((device_comps.device_addr.addr[4]!=0)&&(device_comps.device_addr.addr[3]!=0))
+                   {
+                       if(device_comps.batt>30)
+                       {
+                          //protocolComps.triggerIrq._bit.TLowRealse=1;
+                          
+                       }
+                   }
+                    this->sw._bit.isTLowRealseTriggered=1;
+                    this->sw._bit.isTLowLessTriggered=0;
+               }
+               this->TLowRealseTimer=0;
+           }
+       }
+   }
+}
+
 static void device_comps_task_handle(void)//Execution interval is 200 ms
 {
 	
@@ -1311,6 +1428,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
             this->current_temp_n_2=this->current_temp_n_1;
             this->current_temp_n_1=this->current_temp;
             this->current_temp=this->calc_pt_temp(this);
+            tempOverloadReport(this);
             ad1_ad3_temp-=this->temp_p_temp_n_average_result;
 			
 			if(ad1_ad3_temp<0)
@@ -1414,7 +1532,12 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
 			
 	    }
 			
-		 
+		#ifdef   MD_EXT_MEASUREMENT_MODULE
+          if(this->count==2)
+          {
+            sample_en=0;
+          }
+        #else
 		 if(hum_comps.current_mode==EM_CAL_MODIFY_MODE)
 		 {
              sample_en=1;
@@ -1427,6 +1550,7 @@ static void device_comps_task_handle(void)//Execution interval is 200 ms
             }
            
          }
+        #endif
          if(sample_en)
          {
 
@@ -1537,6 +1661,10 @@ device_comps_t device_comps=
    0,// int PHihgRealseTimer;
    0, //int PLowLessTimer;
    0,// int PLowRealseTimer;
+     0, //int THihgOverTimer;
+   0,// int THihgRealseTimer;
+   0, //int TLowLessTimer;
+   0,// int TLowRealseTimer;
 
     {0},//    unsigned int  ad1_convert_result[MD_ADC_MAX_POS];
     0,//   unsigned int  ad1_pos;
@@ -2004,11 +2132,11 @@ void _50ms_task_handle(void)
 {
     if(pressComps.op_window_time>0)
     {
-        if(pressComps.op_window_time==3)//delay time=timer-20
+        if(pressComps.op_window_time==20)//delay time=timer-20
         {
             MD_IR_VCM_ON;
 		}
-		if(pressComps.op_window_time==2)//delay time=timer-20
+		if(pressComps.op_window_time==18||pressComps.op_window_time==9)//delay time=timer-20
         {
            pressComps.write(0x901f);
         }

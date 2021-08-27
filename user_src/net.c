@@ -62,6 +62,7 @@ static struct
 	unsigned char err_count;
     unsigned char TX_ATCombuffer[120]; 
 	unsigned char send_buf[612];
+	unsigned int  send_len;
 	unsigned char recv_buf[1024];
 	unsigned int  recv_Idx;
 	unsigned char recv_msg_buf[256];//send to protocol layer
@@ -93,6 +94,7 @@ netMisc=
 	0,
 	{0},
 	{0},
+	0,
 	{0},
 	 0,
 	{0},
@@ -272,7 +274,11 @@ static void load_ip(void)
 {
     memset(netComps.net_info.currentIP,0,sizeof(netComps.net_info.currentIP));
     memcpy(netComps.net_info.currentIP,device_comps.access_param.ip,sizeof(device_comps.access_param.ip));
+  #if (APP_PROTOCOL_TYPE==APP_PROTOCOL_ZHIAN)
+    if(strlen(netComps.net_info.currentIP)>6 && device_comps.calibration_param.is_calibrated>0 )
+  #else 
     if(strlen(netComps.net_info.currentIP)>6)
+  #endif
     {
         netComps.net_info.currentIP_No=EM_IP0;
         netComps.net_info.currentPort=device_comps.access_param.port;
@@ -412,7 +418,7 @@ static void TX_ATData(unsigned char  *ptr,unsigned int WaitingTime)
 {
     netComps.AckTmr = WaitingTime;
 	netMisc.AT_Waiting = 1;
-	netMisc.write(ptr,strlen((char *)ptr));
+	netMisc.write(ptr,netMisc.send_len);
 }
 
 static void TX_ATCommand(char  *ptr,unsigned short WaitingTime)
@@ -654,6 +660,7 @@ unsigned char PacketCoapMsg(unsigned char const *buf,int len)
 //    i+=len*2;
 //    memcpy(&netMisc.send_buf[i++],"\r\n",2);//ADD \r\n 
 //    ret=1;
+      netMisc.send_len=len;
       memcpy(&netMisc.send_buf,buf,len); 
 
     return ret;
@@ -1723,6 +1730,7 @@ static void Srv_GSM(void)
                      on_net_device_ack_ok();
 					 netComps.St._bit.socket_connected=1;
 					 netComps.St._bit.allow_data_send=1;
+					 device_comps.sw._bit.isOnline=1;
                 }
 	            else if(check_net_device_ack("+QIOPEN: 0,566")||check_net_device_ack("+QIOPEN: 0,567"))
 				{
@@ -1860,8 +1868,12 @@ static void Srv_GSM(void)
                         }
                         else
                         {
-                            net_status_sjmp_any_step(29);//close socket retry
+                            //net_status_sjmp_any_step(29);//close socket retry
+                           // query_times=0;
+                            protocolComps.sw._bit.DataRdy=0;
+                           // netComps.St._bit.push_data_ok=1;
                             query_times=0;
+                            on_net_device_ack_ok();
                         }
                         
                     }
